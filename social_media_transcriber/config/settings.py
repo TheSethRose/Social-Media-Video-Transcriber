@@ -11,7 +11,6 @@ DEFAULT_WEBHOOK_URL = "https://n8n.seth-rose.dev/webhook/d43ce19f-ab1f-4152-90ba
 # Default output directories
 DEFAULT_OUTPUT_DIR = Path("output")
 DEFAULT_TRANSCRIPTS_DIR = DEFAULT_OUTPUT_DIR / "transcripts"
-DEFAULT_THREADS_DIR = DEFAULT_OUTPUT_DIR / "threads"
 
 # Default bulk processing file
 DEFAULT_BULK_FILE = "bulk.txt"
@@ -25,7 +24,6 @@ VIDEO_FORMAT = "b"  # Best quality format for yt-dlp
 
 # File naming patterns
 TRANSCRIPT_TEMPLATE = "transcript_{video_id}.txt"
-THREAD_TEMPLATE = "tiktok_to_twitter_{topic}.txt"
 BULK_SESSION_TEMPLATE = "bulk_{operation}_{timestamp}"
 
 class Settings:
@@ -36,14 +34,12 @@ class Settings:
         webhook_url: Optional[str] = None,
         output_dir: Optional[Path] = None,
         transcripts_dir: Optional[Path] = None,
-        threads_dir: Optional[Path] = None,
         bulk_file: Optional[str] = None
     ):
         """Initialize settings with optional overrides."""
         self.webhook_url = webhook_url or DEFAULT_WEBHOOK_URL
         self.output_dir = Path(output_dir) if output_dir else DEFAULT_OUTPUT_DIR
         self.transcripts_dir = Path(transcripts_dir) if transcripts_dir else DEFAULT_TRANSCRIPTS_DIR
-        self.threads_dir = Path(threads_dir) if threads_dir else DEFAULT_THREADS_DIR
         self.bulk_file = bulk_file or DEFAULT_BULK_FILE
         
         # Audio settings
@@ -55,5 +51,4 @@ class Settings:
         
         # Templates
         self.transcript_template = TRANSCRIPT_TEMPLATE
-        self.thread_template = THREAD_TEMPLATE
         self.bulk_session_template = BULK_SESSION_TEMPLATE

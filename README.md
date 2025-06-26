@@ -14,7 +14,6 @@ A powerful Python tool for downloading and transcribing videos from multiple pla
 ### Processing Capabilities
 - High-quality transcription using Parakeet-MLX (optimized for Apple Silicon)
 - Bulk processing with automatic playlist/channel expansion
-- Local Twitter thread generation from transcripts
 - Organized output with timestamped directories
 - Progress tracking and comprehensive error handling
 
@@ -59,7 +58,7 @@ python main.py workflow "https://www.youtube.com/@channel_name"
 # Bulk processing from file
 python main.py workflow --bulk --bulk-file example_urls.txt
 
-# Just transcription (no thread generation)
+# Transcription only
 python main.py transcribe "https://www.youtube.com/watch?v=VIDEO_ID"
 python main.py transcribe "https://www.facebook.com/reel/VIDEO_ID"
 python main.py transcribe "https://www.instagram.com/p/POST_ID"
@@ -74,14 +73,10 @@ All outputs are organized in timestamped directories:
 
 ```
 output/
-├── transcripts/
-│   └── 2024-12-07_14-30-45/
-│       ├── video_title_1_transcript.txt
-│       └── video_title_2_transcript.txt
-└── threads/
+└── transcripts/
     └── 2024-12-07_14-30-45/
-        ├── video_title_1_thread.txt
-        └── video_title_2_thread.txt
+        ├── video_title_1_transcript.txt
+        └── video_title_2_transcript.txt
 ```
 
 ## 📚 Available Commands
@@ -90,9 +85,8 @@ output/
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `workflow` | Complete video processing (download → transcribe → thread) | `python main.py workflow "URL"` |
+| `workflow` | Complete video processing (download → transcribe) | `python main.py workflow "URL"` |
 | `transcribe` | Download and transcribe only | `python main.py transcribe "URL"` |
-| `thread` | Generate thread from existing transcript | `python main.py thread transcript.txt` |
 | `bulk` | Process multiple URLs | `python main.py bulk example_urls.txt` |
 
 ### Individual Components
@@ -172,19 +166,13 @@ python main.py workflow --bulk --bulk-file example_urls.txt
 # Specify custom output directory
 python main.py workflow "URL" --output-dir custom_output/
 
-# Different directories for transcripts and threads  
-python main.py workflow "URL" --transcript-dir transcripts/ --thread-dir threads/
+# Custom transcript directory
+python main.py workflow "URL" --transcript-dir transcripts/
 ```
 
 ### Configuration Options
 
 ```bash
-# Skip thread generation
-python main.py workflow "URL" --no-threads
-
-# Custom thread settings
-python main.py workflow "URL" --max-words-per-tweet 270 --max-tweets 15
-
 # Verbose output
 python main.py workflow "URL" --verbose
 ```
@@ -211,7 +199,6 @@ python main.py workflow "URL" --verbose
 social_media_transcriber/
 ├── core/
 │   ├── transcriber.py       # Parakeet-MLX integration
-│   ├── thread_generator.py  # Local thread generation  
 │   ├── providers.py         # Abstract provider base
 │   ├── downloader.py        # Multi-platform video downloader
 │   ├── tiktok_provider.py   # TikTok implementation

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-Main entry point for TikTok Transcribe & Thread Generator.
+Main entry point for Social Media Video Transcriber.
 
 This script provides a unified interface to all functionality:
 - Transcription only (single or bulk)
-- Thread generation only
 - Complete workflow (single or bulk)
 """
 
@@ -16,13 +15,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from social_media_transcriber.cli.transcribe_cli import main as transcribe_main
-from social_media_transcriber.cli.thread_cli import main as thread_main
 from social_media_transcriber.cli.workflow_cli import main as workflow_main
 
 def create_main_parser() -> argparse.ArgumentParser:
     """Create the main argument parser with subcommands."""
     parser = argparse.ArgumentParser(
-        description="TikTok Transcribe & Thread Generator - A complete workflow for processing TikTok, YouTube, Facebook, and Instagram videos",
+        description="Social Media Video Transcriber - A complete workflow for processing TikTok, YouTube, Facebook, and Instagram videos",
         prog="main.py"
     )
     
@@ -43,31 +41,19 @@ def create_main_parser() -> argparse.ArgumentParser:
     transcribe_parser.add_argument("--bulk-file", default="bulk.txt", help="Bulk file path (default: bulk.txt)")
     transcribe_parser.add_argument("--output-dir", help="Output directory for bulk mode")
     
-    # Thread subcommand
-    thread_parser = subparsers.add_parser(
-        "thread",
-        help="Generate Twitter threads from transcripts"
-    )
-    thread_parser.add_argument("transcript", help="Path to transcript file")
-    thread_parser.add_argument("--webhook-url", help="N8N webhook URL")
-    thread_parser.add_argument("-o", "--output-dir", default="threads", help="Output directory (default: threads)")
-    
     # Workflow subcommand (default)
     workflow_parser = subparsers.add_parser(
         "workflow",
-        help="Complete workflow: transcribe + generate threads (default)"
+        help="Complete workflow: transcribe videos (default)"
     )
     workflow_parser.add_argument("url", nargs='?', help="Video URL (TikTok, YouTube, Facebook, or Instagram - required for single mode)")
     workflow_parser.add_argument("--bulk", action="store_true", help="Process URLs from bulk.txt")
     workflow_parser.add_argument("--bulk-file", default="bulk.txt", help="Bulk file path (default: bulk.txt)")
     workflow_parser.add_argument("--webhook-url", help="N8N webhook URL")
     workflow_parser.add_argument("--transcript-file", default="transcript.txt", help="Transcript filename (single mode)")
-    workflow_parser.add_argument("--thread-dir", default="threads", help="Thread directory (single mode)")
     workflow_parser.add_argument("--output-dir", help="Base output directory (bulk mode)")
     workflow_parser.add_argument("--max-videos", type=int, help="Maximum number of videos to process from channels")
-    workflow_parser.add_argument("--max-workers", type=int, default=4, help="Maximum number of concurrent threads (default: 4)")
-    workflow_parser.add_argument("--threaded", action="store_true", help="Use multi-threaded processing")
-    workflow_parser.add_argument("--threads", action="store_true", help="Generate Twitter threads (disabled by default)")
+    workflow_parser.add_argument("--max-workers", type=int, default=4, help="Maximum number of concurrent workers (default: 4)")
     
     return parser
 
@@ -88,7 +74,7 @@ def main() -> None:
             settings = Settings()
             
             print("🔄 Running in legacy mode - complete workflow for single video")
-            workflow_single(url, "transcript.txt", "threads", settings)
+            workflow_single(url, "transcript.txt", settings)
             return
         else:
             print("❌ No command specified. Use --help to see available commands.")
@@ -112,16 +98,6 @@ def main() -> None:
         
         transcribe_main()
         
-    elif args.command == "thread":
-        # Reconstruct sys.argv for thread CLI
-        sys.argv = ["thread.py", args.transcript]
-        if args.webhook_url:
-            sys.argv.extend(["--webhook-url", args.webhook_url])
-        if args.output_dir != "threads":
-            sys.argv.extend(["-o", args.output_dir])
-        
-        thread_main()
-        
     elif args.command == "workflow":
         # Reconstruct sys.argv for workflow CLI
         sys.argv = ["workflow.py"]
@@ -135,18 +111,12 @@ def main() -> None:
             sys.argv.extend(["--webhook-url", args.webhook_url])
         if args.transcript_file != "transcript.txt":
             sys.argv.extend(["--transcript-file", args.transcript_file])
-        if args.thread_dir != "threads":
-            sys.argv.extend(["--thread-dir", args.thread_dir])
         if args.output_dir:
             sys.argv.extend(["--output-dir", args.output_dir])
         if args.max_videos:
             sys.argv.extend(["--max-videos", str(args.max_videos)])
         if args.max_workers != 4:
             sys.argv.extend(["--max-workers", str(args.max_workers)])
-        if args.threaded:
-            sys.argv.append("--threaded")
-        if args.threads:
-            sys.argv.append("--threads")
         
         workflow_main()
 

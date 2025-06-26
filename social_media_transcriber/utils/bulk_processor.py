@@ -10,7 +10,6 @@ from typing import List, Optional, Tuple, Callable
 
 from ..config.settings import Settings
 from ..core.transcriber import AudioTranscriber
-from ..core.thread_generator import ThreadGenerator
 from ..core.downloader import VideoDownloader
 from ..utils.file_utils import (
     load_urls_from_file, 
@@ -34,7 +33,6 @@ class BulkProcessor:
         self.settings = settings or Settings()
         self.max_workers = max_workers
         self.transcriber = AudioTranscriber(self.settings)
-        self.thread_generator = ThreadGenerator(self.settings)
         self.downloader = VideoDownloader(self.settings)
         self._progress_lock = threading.Lock()
     
@@ -137,16 +135,14 @@ class BulkProcessor:
         self,
         bulk_file: Path,
         output_dir: Optional[Path] = None,
-        generate_threads: bool = False,
         progress_callback: Optional[Callable[[int, int, str], None]] = None
     ) -> Tuple[List[str], List[str], Path]:
         """
-        Process multiple videos for complete workflow (transcription + optional threads).
+        Process multiple videos for complete workflow (transcription only).
         
         Args:
             bulk_file: Path to file containing URLs
             output_dir: Optional output directory override
-            generate_threads: Whether to generate Twitter threads (default: False)
             progress_callback: Optional callback for progress updates
             
         Returns:
@@ -167,8 +163,6 @@ class BulkProcessor:
             output_dir or self.settings.output_dir
         )
         
-        threads_dir = session_dir / "threads"
-        
         successful_urls = []
         failed_urls = []
         
@@ -186,13 +180,6 @@ class BulkProcessor:
                 
                 # Transcribe the video
                 self.transcriber.transcribe_from_url(url, transcript_file)
-                
-                # Generate thread (if enabled)
-                if generate_threads:
-                    self.thread_generator.generate_thread_from_file(
-                        transcript_file, 
-                        threads_dir
-                    )
                 
                 successful_urls.append(url)
                 
@@ -342,7 +329,7 @@ class BulkProcessor:
                 print(f"❌ [{video_index}/{total_videos}] Failed: {error_msg}")
             return url, False, error_msg
     
-    def _process_single_video_workflow(self, url: str, session_dir: Path, video_index: int, total_videos: int, generate_threads: bool = False) -> Tuple[str, bool, str]:
+    def _process_single_video_workflow(self, url: str, session_dir: Path, video_index: int, total_videos: int) -> Tuple[str, bool, str]:
         """
         Process a single video for complete workflow (thread-safe).
         
@@ -351,7 +338,6 @@ class BulkProcessor:
             session_dir: Output directory
             video_index: Current video index (1-based)
             total_videos: Total number of videos
-            generate_threads: Whether to generate Twitter threads (default: False)
             
         Returns:
             Tuple of (url, success, error_message)
@@ -363,8 +349,6 @@ class BulkProcessor:
                 self.settings.transcript_template,
                 video_id=video_id
             )
-            thread_dir = session_dir / "threads"
-            thread_dir.mkdir(exist_ok=True)
             
             with self._progress_lock:
                 print(f"🎬 [{video_index}/{total_videos}] Processing: {url}")
@@ -372,18 +356,8 @@ class BulkProcessor:
             # Step 1: Transcribe
             self.transcriber.transcribe_from_url(url, transcript_file)
             
-            # Step 2: Generate thread (if enabled)
-            if generate_threads:
-                thread_file = self.thread_generator.generate_thread_from_file(
-                    transcript_file, 
-                    thread_dir
-                )
-                
-                with self._progress_lock:
-                    print(f"✅ [{video_index}/{total_videos}] Completed: {transcript_file.name} + {thread_file.name}")
-            else:
-                with self._progress_lock:
-                    print(f"✅ [{video_index}/{total_videos}] Completed: {transcript_file.name} (transcription only)")
+            with self._progress_lock:
+                print(f"✅ [{video_index}/{total_videos}] Completed: {transcript_file.name}")
             
             return url, True, ""
             
@@ -470,16 +444,14 @@ class BulkProcessor:
         self,
         bulk_file: Path,
         output_dir: Optional[Path] = None,
-        generate_threads: bool = False,
         progress_callback: Optional[Callable[[int, int, str], None]] = None
     ) -> Tuple[List[str], List[str], Path]:
         """
-        Process multiple videos for complete workflow (transcription + optional threads) using multi-threading.
+        Process multiple videos for complete workflow (transcription) using multi-threading.
         
         Args:
             bulk_file: Path to file containing URLs
             output_dir: Optional output directory override
-            generate_threads: Whether to generate Twitter threads (default: False)
             progress_callback: Optional callback for progress updates
             
         Returns:
@@ -513,8 +485,7 @@ class BulkProcessor:
                     url, 
                     session_dir, 
                     i + 1, 
-                    len(expanded_urls),
-                    generate_threads
+                    len(expanded_urls)
                 ): url 
                 for i, url in enumerate(expanded_urls)
             }
