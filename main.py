@@ -22,7 +22,7 @@ from tiktok_transcribe.cli.workflow_cli import main as workflow_main
 def create_main_parser() -> argparse.ArgumentParser:
     """Create the main argument parser with subcommands."""
     parser = argparse.ArgumentParser(
-        description="TikTok Transcribe & Thread Generator - A complete workflow for processing TikTok and YouTube videos",
+        description="TikTok Transcribe & Thread Generator - A complete workflow for processing TikTok, YouTube, Facebook, and Instagram videos",
         prog="main.py"
     )
     
@@ -35,9 +35,9 @@ def create_main_parser() -> argparse.ArgumentParser:
     # Transcribe subcommand
     transcribe_parser = subparsers.add_parser(
         "transcribe",
-        help="Transcribe videos (TikTok, YouTube - single or bulk)"
+        help="Transcribe videos (TikTok, YouTube, Facebook, Instagram - single or bulk)"
     )
-    transcribe_parser.add_argument("url", nargs='?', help="Video URL (TikTok or YouTube - required for single mode)")
+    transcribe_parser.add_argument("url", nargs='?', help="Video URL (TikTok, YouTube, Facebook, or Instagram - required for single mode)")
     transcribe_parser.add_argument("-o", "--output", default="transcript.txt", help="Output file (default: transcript.txt)")
     transcribe_parser.add_argument("--bulk", action="store_true", help="Process URLs from bulk.txt")
     transcribe_parser.add_argument("--bulk-file", default="bulk.txt", help="Bulk file path (default: bulk.txt)")
@@ -57,7 +57,7 @@ def create_main_parser() -> argparse.ArgumentParser:
         "workflow",
         help="Complete workflow: transcribe + generate threads (default)"
     )
-    workflow_parser.add_argument("url", nargs='?', help="Video URL (TikTok or YouTube - required for single mode)")
+    workflow_parser.add_argument("url", nargs='?', help="Video URL (TikTok, YouTube, Facebook, or Instagram - required for single mode)")
     workflow_parser.add_argument("--bulk", action="store_true", help="Process URLs from bulk.txt")
     workflow_parser.add_argument("--bulk-file", default="bulk.txt", help="Bulk file path (default: bulk.txt)")
     workflow_parser.add_argument("--webhook-url", help="N8N webhook URL")

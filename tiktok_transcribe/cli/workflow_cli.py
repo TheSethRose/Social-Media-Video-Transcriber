@@ -16,14 +16,14 @@ from ..utils.file_utils import extract_video_id, generate_filename
 def create_workflow_parser() -> argparse.ArgumentParser:
     """Create argument parser for workflow CLI."""
     parser = argparse.ArgumentParser(
-        description="Complete video processing workflow: download, transcribe, and generate thread files."
+        description="Complete video processing workflow: download, transcribe, and generate thread files for TikTok, YouTube, Facebook, and Instagram videos."
     )
     
     # Make URL optional for bulk mode
     parser.add_argument(
         "url", 
         nargs='?', 
-        help="Video URL (TikTok or YouTube - required for single mode)"
+        help="Video URL (TikTok, YouTube, Facebook, or Instagram - required for single mode)"
     )
     parser.add_argument(
         "--bulk",
@@ -88,7 +88,7 @@ def workflow_single(
     Process a single video or playlist through the complete workflow.
     
     Args:
-        url: Video URL (TikTok, YouTube video, or YouTube playlist/channel)
+        url: Video URL (TikTok, YouTube video/playlist/channel, Facebook, or Instagram)
         transcript_file: Output transcript filename
         thread_dir: Output directory for thread
         settings: Configuration settings

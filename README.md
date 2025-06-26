@@ -1,12 +1,14 @@
 # Social Media Video Transcriber
 
-A powerful Python tool for downloading and transcribing videos from multiple platforms (TikTok, YouTube) using Parakeet-MLX for high-quality speech-to-text conversion.
+A powerful Python tool for downloading and transcribing videos from multiple platforms (TikTok, YouTube, Facebook, Instagram) using Parakeet-MLX for high-quality speech-to-text conversion.
 
 ## ✨ Features
 
 ### Video Sources
-- **TikTok** - Individual videos
-- **YouTube** - Individual videos, playlists, and channels  
+- **TikTok** - Individual videos with metadata extraction
+- **YouTube** - Individual videos, playlists, and channels
+- **Facebook** - Videos, Reels, and fb.watch URLs
+- **Instagram** - Posts, Reels, IGTV, and Stories  
 - **Extensible** - Easy to add new video providers (see [ADDING_PROVIDERS.md](ADDING_PROVIDERS.md))
 
 ### Processing Capabilities
@@ -42,9 +44,11 @@ source venv/bin/activate
 ### Basic Usage
 
 ```bash
-# Single video (TikTok or YouTube)
+# Single video (TikTok, YouTube, Facebook, or Instagram)
 python main.py workflow "https://www.youtube.com/watch?v=VIDEO_ID"
 python main.py workflow "https://www.tiktok.com/@user/video/123"
+python main.py workflow "https://www.facebook.com/reel/VIDEO_ID"
+python main.py workflow "https://www.instagram.com/p/POST_ID"
 
 # YouTube playlist (automatically expands to individual videos)
 python main.py workflow "https://www.youtube.com/playlist?list=PLAYLIST_ID"
@@ -57,6 +61,8 @@ python main.py workflow --bulk --bulk-file example_urls.txt
 
 # Just transcription (no thread generation)
 python main.py transcribe "https://www.youtube.com/watch?v=VIDEO_ID"
+python main.py transcribe "https://www.facebook.com/reel/VIDEO_ID"
+python main.py transcribe "https://www.instagram.com/p/POST_ID"
 
 # Help
 python main.py --help
@@ -109,6 +115,8 @@ output/
 ### Currently Supported
 - **TikTok** - Individual videos with metadata extraction
 - **YouTube** - Videos, playlists, channels (using yt-dlp)
+- **Facebook** - Videos, Reels, and fb.watch URLs
+- **Instagram** - Posts, Reels, IGTV, and Stories
 
 ### URL Patterns
 ```bash
@@ -127,6 +135,16 @@ https://www.youtube.com/playlist?list=PLAYLIST_ID
 https://www.youtube.com/@channel_name
 https://www.youtube.com/channel/CHANNEL_ID
 https://www.youtube.com/c/CHANNEL_NAME
+
+# Facebook Videos and Reels
+https://www.facebook.com/videos/VIDEO_ID
+https://www.facebook.com/reel/VIDEO_ID
+https://fb.watch/VIDEO_ID
+
+# Instagram Content
+https://www.instagram.com/p/POST_ID
+https://www.instagram.com/reel/REEL_ID
+https://www.instagram.com/tv/IGTV_ID
 ```
 
 ## 🔧 Advanced Usage
@@ -139,6 +157,8 @@ https://www.youtube.com/c/CHANNEL_NAME
 https://www.youtube.com/watch?v=dQw4w9WgXcQ
 https://www.youtube.com/playlist?list=PLrAXtmRdnEQy6nuLMt095B1GdUhWDj0n7
 https://www.tiktok.com/@user/video/123456789
+https://www.facebook.com/reel/2443188852722500
+https://www.instagram.com/p/POST_ID
 ```
 
 2. **Process all URLs:**
@@ -178,8 +198,8 @@ python main.py workflow "URL" --verbose
 
 ### Python Dependencies
 - `parakeet-mlx` - High-quality transcription (Apple Silicon optimized)
-- `yt-dlp` - YouTube video downloading
-- `requests` - HTTP requests for TikTok
+- `yt-dlp` - Multi-platform video downloading (YouTube, Facebook, Instagram)
+- `requests` - HTTP requests for TikTok and other providers
 - `click` - CLI framework
 - Additional utilities (see `requirements.txt`)
 
@@ -190,27 +210,31 @@ python main.py workflow "URL" --verbose
 ```
 tiktok_transcribe/
 ├── core/
-│   ├── transcriber.py      # Parakeet-MLX integration
-│   ├── thread_generator.py # Local thread generation  
-│   ├── video_provider.py   # Abstract provider base
-│   ├── tiktok_provider.py  # TikTok implementation
-│   └── youtube_provider.py # YouTube implementation
+│   ├── transcriber.py       # Parakeet-MLX integration
+│   ├── thread_generator.py  # Local thread generation  
+│   ├── providers.py         # Abstract provider base
+│   ├── downloader.py        # Multi-platform video downloader
+│   ├── tiktok_provider.py   # TikTok implementation
+│   ├── youtube_provider.py  # YouTube implementation
+│   ├── facebook_provider.py # Facebook implementation
+│   └── instagram_provider.py# Instagram implementation
 ├── utils/
-│   ├── bulk_processor.py   # Bulk processing with URL expansion
-│   ├── file_utils.py       # File operations and validation
-│   └── url_handler.py      # URL parsing and validation
+│   ├── bulk_processor.py    # Bulk processing with URL expansion
+│   ├── file_utils.py        # File operations and validation
+│   └── url_handler.py       # URL parsing and validation
 └── cli/
-    └── commands.py         # CLI command implementations
+    └── commands.py          # CLI command implementations
 ```
 
 ### Provider System
 
 The tool uses a plugin-based provider system that makes adding new video platforms straightforward. Each provider implements the `VideoProvider` abstract base class with methods for:
 
-- URL validation and ID extraction
-- Video metadata retrieval  
-- Video downloading
-- Platform-specific optimizations
+- URL validation and platform-specific pattern matching
+- Video ID extraction from various URL formats  
+- Video downloading with platform-optimized settings
+- Audio extraction and format handling
+- Platform-specific error handling and retry logic
 
 ## 🚀 Extending Support
 
@@ -221,14 +245,21 @@ See [ADDING_PROVIDERS.md](ADDING_PROVIDERS.md) for detailed instructions on impl
 ### Quick Provider Template
 
 ```python
-from core.video_provider import VideoProvider
+from core.providers import VideoProvider
 
 class NewPlatformProvider(VideoProvider):
+    def validate_url(self, url: str) -> bool:
+        # Check if URL matches platform patterns
+        pass
+    
     def extract_video_id(self, url: str) -> str:
         # Extract unique video identifier
         pass
         
-    def get_video_info(self, video_id: str) -> dict:
+    def download_video(self, url: str, output_file: Path) -> Path:
+        # Download video with platform-specific settings
+        pass
+```
         # Get video metadata
         pass
         
@@ -242,8 +273,11 @@ class NewPlatformProvider(VideoProvider):
 ### Run Test Cases
 
 ```bash
-# Test single video processing
+# Test single video processing (all platforms)
 python main.py workflow "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+python main.py workflow "https://www.tiktok.com/@user/video/123456789"
+python main.py workflow "https://www.facebook.com/reel/2443188852722500"
+python main.py workflow "https://www.instagram.com/p/POST_ID"
 
 # Test playlist expansion  
 python main.py workflow "https://www.youtube.com/playlist?list=PLrAXtmRdnEQy6nuLMt095B1GdUhWDj0n7"
@@ -251,8 +285,10 @@ python main.py workflow "https://www.youtube.com/playlist?list=PLrAXtmRdnEQy6nuL
 # Test bulk processing
 python main.py workflow --bulk --bulk-file example_urls.txt
 
-# Test individual components
+# Test URL validation for all platforms
 python main.py validate "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+python main.py validate "https://www.facebook.com/reel/2443188852722500"
+python main.py validate "https://www.instagram.com/p/POST_ID"
 python main.py analyze output/transcripts/latest/transcript.txt
 ```
 
