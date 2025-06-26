@@ -10,7 +10,7 @@ The tool uses a provider-based architecture where each video platform implements
 
 ### Abstract Base Class
 
-All providers inherit from `VideoProvider` in `/tiktok_transcribe/core/video_provider.py`:
+All providers inherit from `VideoProvider` in `/social_media_transcriber/core/video_provider.py`:
 
 ```python
 from abc import ABC, abstractmethod
@@ -53,10 +53,10 @@ Each provider must implement four key methods:
 
 ### 1. Create Provider Class
 
-Create a new file in `/tiktok_transcribe/core/` for your provider:
+Create a new file in `/social_media_transcriber/core/` for your provider:
 
 ```python
-# /tiktok_transcribe/core/instagram_provider.py
+# /social_media_transcriber/core/instagram_provider.py
 
 import re
 import requests
@@ -119,7 +119,7 @@ class InstagramProvider(VideoProvider):
 
 ### 2. Register Provider
 
-Add your provider to the provider registry in `/tiktok_transcribe/core/transcriber.py`:
+Add your provider to the provider registry in `/social_media_transcriber/core/transcriber.py`:
 
 ```python
 # In __init__ method of VideoTranscriber class
@@ -133,7 +133,7 @@ def __init__(self):
 
 ### 3. Update URL Handling
 
-Add URL patterns to `/tiktok_transcribe/utils/file_utils.py`:
+Add URL patterns to `/social_media_transcriber/utils/file_utils.py`:
 
 ```python
 def extract_video_id(url: str) -> str:
@@ -305,7 +305,7 @@ Create tests in `/tests/test_providers.py`:
 
 ```python
 import pytest
-from tiktok_transcribe.core.instagram_provider import InstagramProvider
+from social_media_transcriber.core.instagram_provider import InstagramProvider
 
 class TestInstagramProvider:
     def setup_method(self):

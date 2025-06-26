@@ -2,7 +2,7 @@ include README.md
 include requirements.txt
 include setup.sh
 include bulk.txt
-recursive-include tiktok_transcribe *.py
+recursive-include social_media_transcriber *.py
 recursive-include output *
 global-exclude __pycache__
 global-exclude *.py[co]

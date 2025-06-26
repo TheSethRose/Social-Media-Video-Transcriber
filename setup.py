@@ -40,9 +40,9 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "tiktok-transcribe=tiktok_transcribe.cli.workflow_cli:main",
-            "tiktok-transcribe-only=tiktok_transcribe.cli.transcribe_cli:main",
-            "tiktok-thread=tiktok_transcribe.cli.thread_cli:main",
+            "tiktok-transcribe=social_media_transcriber.cli.workflow_cli:main",
+            "tiktok-transcribe-only=social_media_transcriber.cli.transcribe_cli:main",
+            "tiktok-thread=social_media_transcriber.cli.thread_cli:main",
         ],
     },
     include_package_data=True,

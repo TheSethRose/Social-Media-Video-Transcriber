@@ -15,9 +15,9 @@ from pathlib import Path
 # Add the package to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from tiktok_transcribe.cli.transcribe_cli import main as transcribe_main
-from tiktok_transcribe.cli.thread_cli import main as thread_main
-from tiktok_transcribe.cli.workflow_cli import main as workflow_main
+from social_media_transcriber.cli.transcribe_cli import main as transcribe_main
+from social_media_transcriber.cli.thread_cli import main as thread_main
+from social_media_transcriber.cli.workflow_cli import main as workflow_main
 
 def create_main_parser() -> argparse.ArgumentParser:
     """Create the main argument parser with subcommands."""
@@ -81,8 +81,8 @@ def main() -> None:
         # Check if we have a URL argument (legacy single URL mode)
         if len(sys.argv) > 1 and not sys.argv[1].startswith('-'):
             # Legacy mode: python main.py <url>
-            from tiktok_transcribe.cli.workflow_cli import workflow_single
-            from tiktok_transcribe.config.settings import Settings
+            from social_media_transcriber.cli.workflow_cli import workflow_single
+            from social_media_transcriber.config.settings import Settings
             
             url = sys.argv[1]
             settings = Settings()

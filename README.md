@@ -208,7 +208,7 @@ python main.py workflow "URL" --verbose
 ### Core Components
 
 ```
-tiktok_transcribe/
+social_media_transcriber/
 ├── core/
 │   ├── transcriber.py       # Parakeet-MLX integration
 │   ├── thread_generator.py  # Local thread generation  
