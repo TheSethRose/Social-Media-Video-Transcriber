@@ -1,0 +1,11 @@
+# Example bulk processing file
+# Add one URL per line (supports TikTok and YouTube)
+# 
+# Examples:
+# https://www.tiktok.com/@username/video/1234567890
+# https://www.youtube.com/watch?v=VIDEO_ID
+# https://www.youtube.com/playlist?list=PLAYLIST_ID
+# https://www.youtube.com/@channel_name
+#
+# Remove the # from the URLs below to test:
+# https://www.youtube.com/watch?v=8idr1WZ1A7Q&list=PLZHQObOWTQDOjmo3Y6ADm0ScWAlEXf-fp

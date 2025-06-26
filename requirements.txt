@@ -1,0 +1,5 @@
+mlx
+parakeet-mlx
+yt-dlp
+requests
+
