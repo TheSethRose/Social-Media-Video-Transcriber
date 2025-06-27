@@ -6,7 +6,7 @@ import re
 import subprocess
 import logging
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from urllib.parse import urlparse, parse_qs
 
 from .providers import VideoProvider
@@ -99,6 +99,55 @@ class YouTubeProvider(VideoProvider):
             
         except Exception:
             return 'unknown'
+    
+    def get_video_metadata(self, url: str) -> Dict[str, Any]:
+        """
+        Get YouTube video metadata using yt-dlp.
+        
+        Args:
+            url: YouTube video URL
+            
+        Returns:
+            Dictionary containing video metadata
+        """
+        if not self.validate_url(url):
+            raise ValueError(f"Invalid YouTube URL: {url}")
+        
+        try:
+            cmd = [
+                'yt-dlp',
+                '--dump-json',
+                '--no-warnings',
+                '--no-playlist',  # Only get metadata for the specific video
+                url
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            
+            import json
+            metadata = json.loads(result.stdout)
+            
+            return {
+                'title': metadata.get('title', 'Unknown Title'),
+                'video_id': metadata.get('id', self.extract_video_id(url)),
+                'uploader': metadata.get('uploader', metadata.get('channel', None)),
+                'duration': metadata.get('duration'),
+                'description': metadata.get('description'),
+                'upload_date': metadata.get('upload_date'),
+                'view_count': metadata.get('view_count'),
+                'like_count': metadata.get('like_count')
+            }
+            
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Error getting YouTube metadata for {url}: {e}")
+            # Fall back to base implementation
+            return super().get_video_metadata(url)
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing YouTube metadata JSON for {url}: {e}")
+            return super().get_video_metadata(url)
+        except Exception as e:
+            logger.error(f"Unexpected error getting YouTube metadata for {url}: {e}")
+            return super().get_video_metadata(url)
     
     def is_playlist_url(self, url: str) -> bool:
         """Check if URL is a playlist or channel."""

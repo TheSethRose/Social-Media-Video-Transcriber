@@ -29,6 +29,22 @@ class VideoProvider(ABC):
         """Validate if URL belongs to this provider."""
         pass
     
+    @abstractmethod
+    def get_video_metadata(self, url: str) -> Dict[str, Any]:
+        """
+        Get video metadata including title, uploader, etc.
+        
+        Args:
+            url: Video URL
+            
+        Returns:
+            Dictionary containing video metadata with at least:
+            - title: Video title
+            - video_id: Video ID
+            - uploader: Channel/user name (if available)
+        """
+        pass
+    
     @property
     @abstractmethod
     def provider_name(self) -> str:

@@ -41,6 +41,8 @@ downloads/
 !requirements.txt
 !README.txt
 !example_urls.txt
+!docs/*.txt
+!docs/*.md
 
 # IDE
 .vscode/

@@ -55,6 +55,17 @@ def create_workflow_parser() -> argparse.ArgumentParser:
         default=4,
         help="Maximum number of concurrent workers (default: 4)"
     )
+    parser.add_argument(
+        "--speed",
+        type=float,
+        default=3.0,
+        help="Audio speed multiplier for faster transcription (1.0=normal, 2.0=2x, 3.0=3x - default: 3.0)"
+    )
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Run benchmark tests on different speed settings with the provided URL"
+    )
     
     return parser
 
@@ -63,7 +74,9 @@ def workflow_single(
     transcript_file: str, 
     settings: Settings,
     max_videos: Optional[int] = None,
-    max_workers: int = 4
+    max_workers: int = 4,
+    speed_multiplier: float = 3.0,
+    run_benchmark: bool = False
 ) -> None:
     """
     Process a single video or playlist through the complete workflow.
@@ -74,6 +87,8 @@ def workflow_single(
         settings: Configuration settings
         max_videos: Maximum number of videos to process from channels
         max_workers: Number of workers for parallel processing
+        speed_multiplier: Audio speed multiplier for faster transcription
+        run_benchmark: Whether to run speed benchmark tests
     """
     from ..core.youtube_provider import YouTubeProvider
     from ..utils.bulk_processor import BulkProcessor
@@ -122,7 +137,31 @@ def workflow_single(
         return
     
     # Single video processing
+    from ..core.downloader import VideoDownloader
+    from ..utils.file_utils import generate_filename_from_metadata
+    
     transcriber = AudioTranscriber(settings)
+    downloader = VideoDownloader(settings)
+    
+    # Configure speed multiplier
+    transcriber.set_speed_multiplier(speed_multiplier)
+    
+    # Run benchmark if requested
+    if run_benchmark:
+        print(f"🧪 Running speed benchmark on: {url}")
+        try:
+            # Download audio first for benchmarking
+            temp_audio = downloader.download_audio_only(url)
+            transcriber.benchmark_speed_settings(temp_audio)
+            
+            # Clean up temp audio
+            if temp_audio.exists():
+                temp_audio.unlink()
+            
+            return  # Exit after benchmark
+        except Exception as e:
+            print(f"❌ Benchmark failed: {e}")
+            return
     
     transcript_path = Path(transcript_file)
     
@@ -132,6 +171,22 @@ def workflow_single(
     print(f"🎯 Processing single video: {url}")
     
     try:
+        # Generate title-based filename if possible
+        try:
+            provider = downloader.get_provider(url)
+            metadata = provider.get_video_metadata(url)
+            if metadata:
+                # Generate filename using metadata
+                transcript_filename = generate_filename_from_metadata(
+                    settings.transcript_title_template,
+                    metadata
+                )
+                # Update the transcript path to use the generated filename
+                transcript_path = transcript_path.parent / transcript_filename
+                print(f"📝 Generated filename: {transcript_filename}")
+        except Exception as e:
+            print(f"⚠️ Could not extract title, using provided filename: {e}")
+        
         # Step 1: Transcribe
         print("📝 Transcribing video...")
         transcriber.transcribe_from_url(url, transcript_path)
@@ -195,7 +250,9 @@ def main() -> None:
             args.transcript_file, 
             settings,
             max_videos=args.max_videos,
-            max_workers=args.max_workers
+            max_workers=args.max_workers,
+            speed_multiplier=args.speed,
+            run_benchmark=args.benchmark
         )
 
 if __name__ == "__main__":

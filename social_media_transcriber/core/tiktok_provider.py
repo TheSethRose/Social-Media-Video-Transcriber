@@ -6,8 +6,9 @@ import re
 import subprocess
 import tempfile
 import logging
+import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from ..config.settings import Settings
 from .providers import VideoProvider
@@ -174,3 +175,79 @@ class TikTokProvider(VideoProvider):
         except subprocess.CalledProcessError as e:
             logger.error(f"Error downloading TikTok audio {url}: {e}")
             raise RuntimeError(f"Failed to download TikTok audio: {e}")
+    
+    def get_video_metadata(self, url: str) -> Dict[str, Any]:
+        """
+        Get TikTok video metadata using yt-dlp.
+        
+        Args:
+            url: TikTok video URL
+            
+        Returns:
+            Dictionary containing video metadata
+        """
+        if not self.validate_url(url):
+            raise ValueError(f"Invalid TikTok URL: {url}")
+        
+        try:
+            cmd = [
+                'yt-dlp',
+                '--dump-json',
+                '--no-warnings',
+                url
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            
+            metadata = json.loads(result.stdout)
+            
+            return {
+                'title': metadata.get('title', 'TikTok Video'),
+                'video_id': metadata.get('id', self.extract_video_id(url)),
+                'uploader': metadata.get('uploader', metadata.get('creator', None)),
+                'duration': metadata.get('duration'),
+                'description': metadata.get('description'),
+                'upload_date': metadata.get('upload_date'),
+                'view_count': metadata.get('view_count'),
+                'like_count': metadata.get('like_count')
+            }
+            
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Error getting TikTok metadata for {url}: {e}")
+            # Fall back to basic metadata
+            try:
+                video_id = self.extract_video_id(url)
+                return {
+                    'title': f"TikTok_{video_id}",
+                    'video_id': video_id,
+                    'uploader': None,
+                    'duration': None,
+                    'description': None
+                }
+            except Exception:
+                return {
+                    'title': 'TikTok_Video',
+                    'video_id': 'unknown',
+                    'uploader': None,
+                    'duration': None,
+                    'description': None
+                }
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing TikTok metadata JSON for {url}: {e}")
+            video_id = self.extract_video_id(url)
+            return {
+                'title': f"TikTok_{video_id}",
+                'video_id': video_id,
+                'uploader': None,
+                'duration': None,
+                'description': None
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error getting TikTok metadata for {url}: {e}")
+            return {
+                'title': 'TikTok_Video',
+                'video_id': 'unknown',
+                'uploader': None,
+                'duration': None,
+                'description': None
+            }

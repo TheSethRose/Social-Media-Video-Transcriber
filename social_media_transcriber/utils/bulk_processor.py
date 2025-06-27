@@ -16,7 +16,8 @@ from ..utils.file_utils import (
     save_urls_to_file, 
     create_timestamped_directory,
     extract_video_id,
-    generate_filename
+    generate_filename,
+    generate_filename_from_metadata
 )
 
 class BulkProcessor:
@@ -70,6 +71,40 @@ class BulkProcessor:
         
         return expanded_urls
     
+    def generate_filename_with_metadata(self, provider, video_url: str) -> str:
+        """Generate a filename using video metadata (title) with fallback to video_id.
+        
+        Args:
+            provider: The video provider instance
+            video_url: The video URL to extract metadata from
+            
+        Returns:
+            Generated filename for the transcript
+        """
+        try:
+            # Try to get video metadata for title-based filename
+            metadata = provider.get_video_metadata(video_url)
+            if metadata:
+                return generate_filename_from_metadata(
+                    self.settings.transcript_title_template,
+                    metadata
+                )
+        except Exception as e:
+            print(f"⚠️ Failed to get metadata for {video_url}: {e}")
+        
+        # Fallback to video_id based filename
+        try:
+            video_id = provider.extract_video_id(video_url)
+            return generate_filename(
+                self.settings.transcript_filename_template,
+                video_id
+            )
+        except Exception as e:
+            print(f"⚠️ Failed to extract video_id for {video_url}: {e}")
+            
+        # Final fallback to generic filename
+        return f"transcript_{int(time.time())}.txt"
+    
     def process_bulk_transcription(
         self,
         bulk_file: Path,
@@ -110,12 +145,12 @@ class BulkProcessor:
                 progress_callback(i, len(expanded_urls), url)
             
             try:
-                # Generate transcript filename
-                video_id = extract_video_id(url)
-                transcript_file = session_dir / generate_filename(
-                    self.settings.transcript_template,
-                    video_id=video_id
-                )
+                # Get provider for this URL
+                provider = self.downloader.get_provider(url)
+                
+                # Generate transcript filename using metadata
+                transcript_filename = self.generate_filename_with_metadata(provider, url)
+                transcript_file = session_dir / transcript_filename
                 
                 # Transcribe the video
                 self.transcriber.transcribe_from_url(url, transcript_file)
@@ -171,12 +206,12 @@ class BulkProcessor:
                 progress_callback(i, len(expanded_urls), url)
             
             try:
-                # Generate transcript filename
-                video_id = extract_video_id(url)
-                transcript_file = session_dir / generate_filename(
-                    self.settings.transcript_template,
-                    video_id=video_id
-                )
+                # Get provider for this URL
+                provider = self.downloader.get_provider(url)
+                
+                # Generate transcript filename using metadata
+                transcript_filename = self.generate_filename_with_metadata(provider, url)
+                transcript_file = session_dir / transcript_filename
                 
                 # Transcribe the video
                 self.transcriber.transcribe_from_url(url, transcript_file)
@@ -305,12 +340,12 @@ class BulkProcessor:
             Tuple of (url, success, error_message)
         """
         try:
-            # Generate transcript filename
-            video_id = extract_video_id(url)
-            transcript_file = session_dir / generate_filename(
-                self.settings.transcript_template,
-                video_id=video_id
-            )
+            # Get provider for this URL
+            provider = self.downloader.get_provider(url)
+            
+            # Generate transcript filename using metadata
+            transcript_filename = self.generate_filename_with_metadata(provider, url)
+            transcript_file = session_dir / transcript_filename
             
             with self._progress_lock:
                 print(f"🎬 [{video_index}/{total_videos}] Processing: {url}")
@@ -343,12 +378,12 @@ class BulkProcessor:
             Tuple of (url, success, error_message)
         """
         try:
-            # Generate filenames
-            video_id = extract_video_id(url)
-            transcript_file = session_dir / generate_filename(
-                self.settings.transcript_template,
-                video_id=video_id
-            )
+            # Get provider for this URL
+            provider = self.downloader.get_provider(url)
+            
+            # Generate transcript filename using metadata
+            transcript_filename = self.generate_filename_with_metadata(provider, url)
+            transcript_file = session_dir / transcript_filename
             
             with self._progress_lock:
                 print(f"🎬 [{video_index}/{total_videos}] Processing: {url}")

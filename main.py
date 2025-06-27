@@ -40,6 +40,7 @@ def create_main_parser() -> argparse.ArgumentParser:
     transcribe_parser.add_argument("--bulk", action="store_true", help="Process URLs from bulk.txt")
     transcribe_parser.add_argument("--bulk-file", default="bulk.txt", help="Bulk file path (default: bulk.txt)")
     transcribe_parser.add_argument("--output-dir", help="Output directory for bulk mode")
+    transcribe_parser.add_argument("--speed", type=float, default=3.0, help="Audio speed multiplier (1.0=normal, 2.0=2x, 3.0=3x - default: 3.0)")
     
     # Workflow subcommand (default)
     workflow_parser = subparsers.add_parser(
@@ -54,6 +55,8 @@ def create_main_parser() -> argparse.ArgumentParser:
     workflow_parser.add_argument("--output-dir", help="Base output directory (bulk mode)")
     workflow_parser.add_argument("--max-videos", type=int, help="Maximum number of videos to process from channels")
     workflow_parser.add_argument("--max-workers", type=int, default=4, help="Maximum number of concurrent workers (default: 4)")
+    workflow_parser.add_argument("--speed", type=float, default=3.0, help="Audio speed multiplier (1.0=normal, 2.0=2x, 3.0=3x - default: 3.0)")
+    workflow_parser.add_argument("--benchmark", action="store_true", help="Run benchmark tests on different speed settings")
     
     return parser
 
@@ -95,6 +98,8 @@ def main() -> None:
             sys.argv.extend(["--bulk-file", args.bulk_file])
         if args.output_dir:
             sys.argv.extend(["--output-dir", args.output_dir])
+        if hasattr(args, 'speed') and args.speed != 3.0:
+            sys.argv.extend(["--speed", str(args.speed)])
         
         transcribe_main()
         
@@ -117,6 +122,10 @@ def main() -> None:
             sys.argv.extend(["--max-videos", str(args.max_videos)])
         if args.max_workers != 4:
             sys.argv.extend(["--max-workers", str(args.max_workers)])
+        if hasattr(args, 'speed') and args.speed != 3.0:
+            sys.argv.extend(["--speed", str(args.speed)])
+        if hasattr(args, 'benchmark') and args.benchmark:
+            sys.argv.append("--benchmark")
         
         workflow_main()
 

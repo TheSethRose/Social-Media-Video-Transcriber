@@ -44,10 +44,16 @@ def create_transcribe_parser() -> argparse.ArgumentParser:
         default="output",
         help="Output directory for bulk mode (default: output)"
     )
+    parser.add_argument(
+        "--speed",
+        type=float,
+        default=3.0,
+        help="Audio speed multiplier for faster transcription (1.0=normal, 2.0=2x, 3.0=3x - default: 3.0)"
+    )
     
     return parser
 
-def transcribe_single(url: str, output_file: str, settings: Settings) -> None:
+def transcribe_single(url: str, output_file: str, settings: Settings, speed_multiplier: float = 3.0) -> None:
     """
     Transcribe a single video.
     
@@ -55,9 +61,17 @@ def transcribe_single(url: str, output_file: str, settings: Settings) -> None:
         url: Video URL (TikTok or YouTube)
         output_file: Output file path
         settings: Configuration settings
+        speed_multiplier: Audio speed multiplier for faster transcription
     """
+    from ..core.downloader import VideoDownloader
+    from ..utils.file_utils import generate_filename_from_metadata
+    
     transcriber = AudioTranscriber(settings)
+    downloader = VideoDownloader(settings)
     output_path = Path(output_file)
+    
+    # Configure speed multiplier
+    transcriber.set_speed_multiplier(speed_multiplier)
     
     # Ensure output directory exists
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -65,6 +79,22 @@ def transcribe_single(url: str, output_file: str, settings: Settings) -> None:
     print(f"🎯 Transcribing single video: {url}")
     
     try:
+        # Generate title-based filename if possible
+        try:
+            provider = downloader.get_provider(url)
+            metadata = provider.get_video_metadata(url)
+            if metadata:
+                # Generate filename using metadata
+                transcript_filename = generate_filename_from_metadata(
+                    settings.transcript_title_template,
+                    metadata
+                )
+                # Update the output path to use the generated filename
+                output_path = output_path.parent / transcript_filename
+                print(f"📝 Generated filename: {transcript_filename}")
+        except Exception as e:
+            print(f"⚠️ Could not extract title, using provided filename: {e}")
+        
         result_path = transcriber.transcribe_from_url(url, output_path)
         print(f"✅ Transcript saved to: {result_path.absolute()}")
     except Exception as e:
@@ -74,7 +104,8 @@ def transcribe_single(url: str, output_file: str, settings: Settings) -> None:
 def transcribe_bulk(
     bulk_file: str, 
     output_dir: Optional[str], 
-    settings: Settings
+    settings: Settings,
+    speed_multiplier: float = 3.0
 ) -> None:
     """
     Transcribe multiple TikTok videos from bulk file.
@@ -83,6 +114,7 @@ def transcribe_bulk(
         bulk_file: Path to bulk file
         output_dir: Optional output directory
         settings: Configuration settings
+        speed_multiplier: Audio speed multiplier for faster transcription
     """
     bulk_path = Path(bulk_file)
     output_path = Path(output_dir) if output_dir else None
@@ -92,6 +124,9 @@ def transcribe_bulk(
         sys.exit(1)
     
     processor = BulkProcessor(settings)
+    
+    # Configure speed multiplier for the transcriber
+    processor.transcriber.set_speed_multiplier(speed_multiplier)
     
     print(f"🚀 Starting bulk transcription from: {bulk_path}")
     
@@ -133,7 +168,7 @@ def main() -> None:
     
     if args.bulk:
         # Bulk processing mode
-        transcribe_bulk(args.bulk_file, args.output_dir, settings)
+        transcribe_bulk(args.bulk_file, args.output_dir, settings, speed_multiplier=args.speed)
     else:
         # Single video mode
         if not args.url:
@@ -141,7 +176,7 @@ def main() -> None:
             parser.print_help()
             sys.exit(1)
         
-        transcribe_single(args.url, args.output, settings)
+        transcribe_single(args.url, args.output, settings, speed_multiplier=args.speed)
 
 if __name__ == "__main__":
     main()

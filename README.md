@@ -9,7 +9,7 @@ A powerful Python tool for downloading and transcribing videos from multiple pla
 - **YouTube** - Individual videos, playlists, and channels
 - **Facebook** - Videos, Reels, and fb.watch URLs
 - **Instagram** - Posts, Reels, IGTV, and Stories  
-- **Extensible** - Easy to add new video providers (see [ADDING_PROVIDERS.md](ADDING_PROVIDERS.md))
+- **Extensible** - Easy to add new video providers (see [docs/ADDING_PROVIDERS.md](docs/ADDING_PROVIDERS.md))
 
 ### Processing Capabilities
 - High-quality transcription using Parakeet-MLX (optimized for Apple Silicon)
@@ -227,7 +227,7 @@ The tool uses a plugin-based provider system that makes adding new video platfor
 
 ### Adding New Video Providers
 
-See [ADDING_PROVIDERS.md](ADDING_PROVIDERS.md) for detailed instructions on implementing support for new video platforms.
+See [docs/ADDING_PROVIDERS.md](docs/ADDING_PROVIDERS.md) for detailed instructions on implementing support for new video platforms.
 
 ### Quick Provider Template
 
@@ -341,7 +341,15 @@ pip install -r requirements.txt
 pip install -e .  # Install in development mode
 ```
 
-## 📄 License
+## � Documentation
+
+For detailed documentation, see the [`docs/`](docs/) folder:
+
+- **[Audio Speed Optimization](docs/AUDIO_SPEED_OPTIMIZATION.md)** - Complete guide to the speed optimization feature
+- **[Adding Providers](docs/ADDING_PROVIDERS.md)** - How to add support for new video platforms  
+- **[Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md)** - Technical overview of recent features
+
+## �📄 License
 
 [Add your license information here]
 

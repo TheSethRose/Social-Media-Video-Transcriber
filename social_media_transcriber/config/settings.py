@@ -18,12 +18,14 @@ DEFAULT_BULK_FILE = "bulk.txt"
 # Audio processing settings
 AUDIO_SAMPLE_RATE = 16000  # 16kHz required by Parakeet-MLX
 AUDIO_CHANNELS = 1  # Mono
+AUDIO_SPEED_MULTIPLIER = 3.0  # Speed up audio for faster transcription (1.0 = normal, 2.0 = 2x, 3.0 = 3x)
 
 # Video download settings
 VIDEO_FORMAT = "b"  # Best quality format for yt-dlp
 
 # File naming patterns
 TRANSCRIPT_TEMPLATE = "transcript_{video_id}.txt"
+TRANSCRIPT_TITLE_TEMPLATE = "{title}_transcript.txt"
 BULK_SESSION_TEMPLATE = "bulk_{operation}_{timestamp}"
 
 class Settings:
@@ -45,10 +47,12 @@ class Settings:
         # Audio settings
         self.audio_sample_rate = AUDIO_SAMPLE_RATE
         self.audio_channels = AUDIO_CHANNELS
+        self.audio_speed_multiplier = AUDIO_SPEED_MULTIPLIER
         
         # Video settings
         self.video_format = VIDEO_FORMAT
         
         # Templates
         self.transcript_template = TRANSCRIPT_TEMPLATE
+        self.transcript_title_template = TRANSCRIPT_TITLE_TEMPLATE
         self.bulk_session_template = BULK_SESSION_TEMPLATE
