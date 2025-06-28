@@ -65,6 +65,29 @@ class VideoProvider(ABC):
         """Extract individual video URLs from playlist/channel. Default: return single URL."""
         return [url] if self.validate_url(url) else []
     
+    def get_playlist_metadata(self, url: str) -> Dict[str, Any]:
+        """
+        Get playlist metadata including title, uploader, etc.
+        Default implementation for providers that don't support playlists.
+        
+        Args:
+            url: Playlist URL
+            
+        Returns:
+            Dictionary containing playlist metadata with at least:
+            - title: Playlist title
+            - playlist_id: Playlist ID
+            - uploader: Channel/user name (if available)
+            - video_count: Number of videos (if available)
+        """
+        return {
+            'title': 'Unknown Playlist',
+            'playlist_id': 'unknown',
+            'uploader': None,
+            'description': None,
+            'video_count': 0
+        }
+    
     def get_url_type(self, url: str) -> str:
         """
         Get the type of URL: 'video', 'playlist', 'channel', or 'unknown'.

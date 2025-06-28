@@ -6,6 +6,7 @@
 # https://www.youtube.com/watch?v=VIDEO_ID
 # https://www.youtube.com/playlist?list=PLAYLIST_ID
 # https://www.youtube.com/@channel_name
+# https://www.youtube.com/@channel_name/playlists
 # https://www.facebook.com/username/videos/1234567890
 # https://fb.watch/VIDEO_ID
 # https://www.instagram.com/p/POST_ID/

@@ -55,16 +55,17 @@ def create_transcribe_parser() -> argparse.ArgumentParser:
 
 def transcribe_single(url: str, output_file: str, settings: Settings, speed_multiplier: float = 3.0) -> None:
     """
-    Transcribe a single video.
+    Transcribe a single video or playlist.
     
     Args:
-        url: Video URL (TikTok or YouTube)
-        output_file: Output file path
+        url: Video URL (TikTok or YouTube) - can be single video or playlist
+        output_file: Output file path (ignored for playlists)
         settings: Configuration settings
         speed_multiplier: Audio speed multiplier for faster transcription
     """
     from ..core.downloader import VideoDownloader
     from ..utils.file_utils import generate_filename_from_metadata
+    from ..utils.bulk_processor import BulkProcessor
     
     transcriber = AudioTranscriber(settings)
     downloader = VideoDownloader(settings)
@@ -73,6 +74,46 @@ def transcribe_single(url: str, output_file: str, settings: Settings, speed_mult
     # Configure speed multiplier
     transcriber.set_speed_multiplier(speed_multiplier)
     
+    # Check if this is a playlist
+    try:
+        provider = downloader.get_provider(url)
+        if hasattr(provider, 'is_playlist_url') and provider.is_playlist_url(url):
+            print(f"📋 Detected playlist URL, processing as playlist...")
+            
+            # Use bulk processor for playlist handling
+            processor = BulkProcessor(settings)
+            processor.transcriber.set_speed_multiplier(speed_multiplier)
+            
+            # Create a temporary "bulk file" with just this playlist URL
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
+                temp_file.write(url + '\n')
+                temp_file_path = Path(temp_file.name)
+            
+            try:
+                # Process the playlist
+                successful_urls, failed_urls, session_dir = processor.process_bulk_transcription(
+                    temp_file_path,
+                    output_path.parent,
+                    progress_callback=BulkProcessor.print_progress
+                )
+                
+                print(f"✅ Playlist processing complete!")
+                print(f"📁 Output directory: {session_dir.absolute()}")
+                print(f"✅ Successfully processed: {len(successful_urls)} videos")
+                if failed_urls:
+                    print(f"❌ Failed: {len(failed_urls)} videos")
+                
+            finally:
+                # Clean up temporary file
+                temp_file_path.unlink(missing_ok=True)
+            
+            return
+    except Exception as e:
+        print(f"⚠️ Error checking if URL is playlist: {e}")
+        # Continue with single video processing
+    
+    # Single video processing
     # Ensure output directory exists
     output_path.parent.mkdir(parents=True, exist_ok=True)
     

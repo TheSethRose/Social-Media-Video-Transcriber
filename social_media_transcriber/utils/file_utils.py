@@ -73,6 +73,77 @@ def save_urls_to_file(file_path: Path, urls: List[str]) -> None:
         for url in urls:
             f.write(f"{url}\n")
 
+def sanitize_folder_name(name: str, max_length: int = 100) -> str:
+    """
+    Sanitize a string to be safe for use as a folder name.
+    
+    Args:
+        name: The original name string
+        max_length: Maximum length for the folder name (default: 100)
+        
+    Returns:
+        Sanitized folder name
+    """
+    # Remove or replace problematic characters
+    # Keep alphanumeric, spaces, hyphens, underscores, and basic punctuation
+    sanitized = re.sub(r'[<>:"/\\|?*]', '', name)  # Remove forbidden chars
+    sanitized = re.sub(r'[^\w\s\-_.,()[\]{}]', '', sanitized)  # Keep only safe chars
+    sanitized = re.sub(r'\s+', ' ', sanitized)  # Normalize whitespace
+    sanitized = sanitized.strip()  # Remove leading/trailing whitespace
+    
+    # Truncate if too long, but try to keep whole words
+    if len(sanitized) > max_length:
+        sanitized = sanitized[:max_length].rsplit(' ', 1)[0]
+    
+    # Ensure we have something valid
+    if not sanitized:
+        sanitized = "unknown"
+    
+    return sanitized
+
+def create_playlist_directory(
+    playlist_title: str,
+    parent_dir: Optional[Path] = None,
+    fallback_name: str = "playlist"
+) -> Path:
+    """
+    Create a directory named after a playlist title.
+    
+    Args:
+        playlist_title: The playlist title to use for naming
+        parent_dir: Parent directory (defaults to current directory)
+        fallback_name: Fallback name if title is invalid
+        
+    Returns:
+        Path to the created directory
+    """
+    # Sanitize the playlist title for use as a folder name
+    folder_name = sanitize_folder_name(playlist_title)
+    
+    # If sanitization results in an empty or very short name, use fallback
+    if len(folder_name.strip()) < 3:
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        folder_name = f"{fallback_name}_{timestamp}"
+    
+    if parent_dir:
+        playlist_dir = parent_dir / folder_name
+    else:
+        playlist_dir = Path(folder_name)
+    
+    # Handle potential naming conflicts by adding a number suffix
+    original_name = folder_name
+    counter = 1
+    while playlist_dir.exists():
+        folder_name = f"{original_name}_{counter}"
+        if parent_dir:
+            playlist_dir = parent_dir / folder_name
+        else:
+            playlist_dir = Path(folder_name)
+        counter += 1
+    
+    playlist_dir.mkdir(parents=True, exist_ok=True)
+    return playlist_dir
+
 def create_timestamped_directory(
     base_name: str, 
     parent_dir: Optional[Path] = None

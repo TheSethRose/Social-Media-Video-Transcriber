@@ -6,13 +6,15 @@ A powerful Python tool for downloading and transcribing videos from multiple pla
 
 ### Video Sources
 - **TikTok** - Individual videos with metadata extraction
-- **YouTube** - Individual videos, playlists, and channels
+- **YouTube** - Individual videos, playlists, channels, and ALL channel playlists
 - **Facebook** - Videos, Reels, and fb.watch URLs
 - **Instagram** - Posts, Reels, IGTV, and Stories  
 - **Extensible** - Easy to add new video providers (see [docs/ADDING_PROVIDERS.md](docs/ADDING_PROVIDERS.md))
 
 ### Processing Capabilities
 - High-quality transcription using Parakeet-MLX (optimized for Apple Silicon)
+- **3x faster transcription** with audio speed optimization (maintains quality)
+- **Automatic playlist organization** - folders named after YouTube playlist titles
 - Bulk processing with automatic playlist/channel expansion
 - Organized output with timestamped directories
 - Progress tracking and comprehensive error handling
@@ -55,6 +57,9 @@ python main.py workflow "https://www.youtube.com/playlist?list=PLAYLIST_ID"
 # YouTube channel (processes recent videos)
 python main.py workflow "https://www.youtube.com/@channel_name"
 
+# YouTube channel playlists (processes ALL playlists from a channel)
+python main.py workflow "https://www.youtube.com/@channel_name/playlists"
+
 # Bulk processing from file
 python main.py workflow --bulk --bulk-file example_urls.txt
 
@@ -69,14 +74,38 @@ python main.py --help
 
 ## 📁 Output Structure
 
-All outputs are organized in timestamped directories:
+### Automatic Organization
 
+**Single Videos:**
 ```
 output/
 └── transcripts/
-    └── 2024-12-07_14-30-45/
+    └── bulk_transcription_2024-12-27_14-30-45/
         ├── video_title_1_transcript.txt
         └── video_title_2_transcript.txt
+```
+
+**YouTube Playlists:**
+```
+output/
+└── MIT 6.034 Artificial Intelligence, Fall 2010/
+    ├── 1. Introduction and Scope_transcript.txt
+    ├── 2. Reasoning Goal Trees and Problem Solving_transcript.txt
+    ├── 3. Reasoning Goal Trees and Rule-Based Expert Systems_transcript.txt
+    └── ... (all videos in playlist)
+```
+
+**Mixed Bulk Processing:**
+```
+output/
+├── MIT 6.034 Artificial Intelligence, Fall 2010/    # Playlist folder
+│   ├── 1. Introduction and Scope_transcript.txt
+│   └── 2. Reasoning Goal Trees_transcript.txt
+├── Stanford CS229 Machine Learning/                  # Another playlist
+│   ├── Lecture 1_transcript.txt
+│   └── Lecture 2_transcript.txt
+└── bulk_transcription_2024-12-27_14-30-45/         # Individual videos
+    └── single_video_title_transcript.txt
 ```
 
 ## 📚 Available Commands
@@ -130,6 +159,9 @@ https://www.youtube.com/@channel_name
 https://www.youtube.com/channel/CHANNEL_ID
 https://www.youtube.com/c/CHANNEL_NAME
 
+# YouTube Channel Playlists (processes ALL playlists from a channel)
+https://www.youtube.com/@channel_name/playlists
+
 # Facebook Videos and Reels
 https://www.facebook.com/videos/VIDEO_ID
 https://www.facebook.com/reel/VIDEO_ID
@@ -139,6 +171,35 @@ https://fb.watch/VIDEO_ID
 https://www.instagram.com/p/POST_ID
 https://www.instagram.com/reel/REEL_ID
 https://www.instagram.com/tv/IGTV_ID
+```
+
+### 🎯 Channel Playlists Feature
+
+**NEW**: You can now transcribe ALL playlists from a YouTube channel at once!
+
+```bash
+# Process ALL playlists from a channel
+python main.py workflow "https://www.youtube.com/@aiexplained-official/playlists"
+
+# This will:
+# 1. Discover all playlists in the channel
+# 2. Extract all videos from each playlist  
+# 3. Organize transcripts by playlist folders
+# 4. Process everything automatically
+```
+
+**Example Output Structure:**
+```
+output/
+├── Anthropic and Claude/
+│   ├── video1_transcript.txt
+│   └── video2_transcript.txt
+├── The AI News You May Have Missed/
+│   ├── video3_transcript.txt
+│   └── video4_transcript.txt
+└── Documentaries/
+    ├── video5_transcript.txt
+    └── video6_transcript.txt
 ```
 
 ## 🔧 Advanced Usage
@@ -158,6 +219,31 @@ https://www.instagram.com/p/POST_ID
 2. **Process all URLs:**
 ```bash
 python main.py workflow --bulk --bulk-file example_urls.txt
+```
+
+### Speed Optimization
+
+```bash
+# Default 3x speed (recommended)
+python main.py transcribe "URL"
+
+# Custom speed (1.0 = normal, 2.0 = 2x, 3.0 = 3x, up to 4.0)
+python main.py transcribe "URL" --speed 2.0
+
+# Benchmark mode (shows timing comparisons)
+python main.py transcribe "URL" --benchmark
+```
+
+### Playlist Processing
+
+```bash
+# Single playlist - creates folder named after playlist
+python main.py transcribe "https://www.youtube.com/playlist?list=PLAYLIST_ID"
+
+# Multiple playlists in bulk file
+echo "https://www.youtube.com/playlist?list=PLAYLIST_1" > playlists.txt
+echo "https://www.youtube.com/playlist?list=PLAYLIST_2" >> playlists.txt
+python main.py transcribe --bulk --bulk-file playlists.txt
 ```
 
 ### Custom Output Directories
@@ -341,13 +427,19 @@ pip install -r requirements.txt
 pip install -e .  # Install in development mode
 ```
 
-## � Documentation
+## 📖 Documentation
 
 For detailed documentation, see the [`docs/`](docs/) folder:
 
-- **[Audio Speed Optimization](docs/AUDIO_SPEED_OPTIMIZATION.md)** - Complete guide to the speed optimization feature
+### Core Features
+- **[Audio Speed Optimization](docs/AUDIO_SPEED_OPTIMIZATION.md)** - Complete guide to the speed optimization feature that reduces transcription time by 50-67%
+- **[Playlist Folder Naming](docs/PLAYLIST_FOLDER_NAMING.md)** - Automatic folder organization based on YouTube playlist titles
+
+### Development & Extension
 - **[Adding Providers](docs/ADDING_PROVIDERS.md)** - How to add support for new video platforms  
-- **[Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md)** - Technical overview of recent features
+
+### Implementation Details
+- **[Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md)** - Technical overview of recent features and implementation details
 
 ## �📄 License
 

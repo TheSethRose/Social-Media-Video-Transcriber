@@ -15,6 +15,7 @@ from ..utils.file_utils import (
     load_urls_from_file, 
     save_urls_to_file, 
     create_timestamped_directory,
+    create_playlist_directory,
     extract_video_id,
     generate_filename,
     generate_filename_from_metadata
@@ -39,7 +40,8 @@ class BulkProcessor:
     
     def expand_urls(self, urls: List[str]) -> List[str]:
         """
-        Expand URLs that may contain playlists or channels into individual video URLs.
+        Legacy method for backward compatibility with threaded processing.
+        Expand URLs to individual video URLs without playlist context.
         
         Args:
             urls: List of URLs (may include playlists/channels)
@@ -47,29 +49,67 @@ class BulkProcessor:
         Returns:
             List of individual video URLs
         """
-        expanded_urls = []
+        expanded_data = self.expand_urls_with_context(urls)
+        return [video_url for video_url, _, _ in expanded_data]
+    
+    def expand_urls_with_context(self, urls: List[str]) -> List[Tuple[str, Optional[str], Optional[str]]]:
+        """
+        Expand URLs that may contain playlists or channels into individual video URLs,
+        keeping track of which playlist/channel they came from.
+        
+        Args:
+            urls: List of URLs (may include playlists/channels)
+            
+        Returns:
+            List of tuples: (video_url, playlist_title, playlist_id)
+            For non-playlist URLs: (video_url, None, None)
+        """
+        expanded_data = []
         
         for url in urls:
             try:
                 # Get the appropriate provider for this URL
                 provider = self.downloader.get_provider(url)
                 
-                # Use the provider's extract_video_urls method
-                individual_urls = provider.extract_video_urls(url)
-                expanded_urls.extend(individual_urls)
-                
-                # Print expansion info
-                if len(individual_urls) > 1:
-                    print(f"📋 Expanded {url} into {len(individual_urls)} videos")
-                elif len(individual_urls) == 0:
-                    print(f"⚠️ No videos found in {url}")
+                # Check if this is a playlist/channel
+                if hasattr(provider, 'is_playlist_url') and provider.is_playlist_url(url):
+                    # Get playlist metadata first
+                    playlist_title = None
+                    playlist_id = None
+                    
+                    try:
+                        # Try to get playlist metadata
+                        playlist_metadata = provider.get_playlist_metadata(url)
+                        playlist_title = playlist_metadata.get('title', 'Unknown Playlist')
+                        playlist_id = playlist_metadata.get('playlist_id', 'unknown')
+                        print(f"📋 Found playlist: {playlist_title}")
+                    except (AttributeError, Exception) as e:
+                        print(f"⚠️ Could not get playlist metadata for {url}: {e}")
+                        playlist_title = "Unknown Playlist"
+                        playlist_id = "unknown"
+                    
+                    # Now expand to individual video URLs
+                    individual_urls = provider.extract_video_urls(url)
+                    
+                    # Add all videos with playlist context
+                    for video_url in individual_urls:
+                        expanded_data.append((video_url, playlist_title, playlist_id))
+                    
+                    # Print expansion info
+                    if len(individual_urls) > 1:
+                        print(f"� Expanded playlist into {len(individual_urls)} videos")
+                    elif len(individual_urls) == 0:
+                        print(f"⚠️ No videos found in playlist {url}")
+                else:
+                    # Single video URL
+                    expanded_data.append((url, None, None))
                     
             except Exception as e:
-                print(f"⚠️ Could not expand URL {url}: {str(e)}")
-                # If expansion fails, just use the original URL
-                expanded_urls.append(url)
+                print(f"⚠️ Could not process URL {url}: {str(e)}")
+                # If processing fails, treat as single video
+                expanded_data.append((url, None, None))
         
-        return expanded_urls
+        return expanded_data
     
     def generate_filename_with_metadata(self, provider, video_url: str) -> str:
         """Generate a filename using video metadata (title) with fallback to video_id.
@@ -96,8 +136,8 @@ class BulkProcessor:
         try:
             video_id = provider.extract_video_id(video_url)
             return generate_filename(
-                self.settings.transcript_filename_template,
-                video_id
+                self.settings.transcript_template,
+                video_id=video_id
             )
         except Exception as e:
             print(f"⚠️ Failed to extract video_id for {video_url}: {e}")
@@ -126,45 +166,85 @@ class BulkProcessor:
         if not urls:
             raise ValueError(f"No URLs found in {bulk_file}")
         
-        # Expand URLs (playlists/channels into individual videos)
+        # Expand URLs with playlist context
         print(f"🔍 Expanding URLs...")
-        expanded_urls = self.expand_urls(urls)
-        print(f"📹 Processing {len(expanded_urls)} video(s) for transcription")
+        expanded_data = self.expand_urls_with_context(urls)
+        print(f"📹 Processing {len(expanded_data)} video(s) for transcription")
         
-        # Create session directory
-        session_dir = create_timestamped_directory(
-            "bulk_transcription",
-            output_dir or self.settings.output_dir
-        )
+        # Create base session directory
+        base_output_dir = output_dir or self.settings.output_dir
+        
+        # Group videos by playlist (None for non-playlist videos)
+        playlist_groups = {}
+        for video_url, playlist_title, playlist_id in expanded_data:
+            if playlist_title:
+                # Group by playlist
+                key = (playlist_title, playlist_id)
+                if key not in playlist_groups:
+                    playlist_groups[key] = []
+                playlist_groups[key].append(video_url)
+            else:
+                # Single videos go in a timestamped directory
+                key = (None, None)
+                if key not in playlist_groups:
+                    playlist_groups[key] = []
+                playlist_groups[key].append(video_url)
         
         successful_urls = []
         failed_urls = []
+        session_dir = None
         
-        for i, url in enumerate(expanded_urls, 1):
-            if progress_callback:
-                progress_callback(i, len(expanded_urls), url)
+        # Process each group
+        for (playlist_title, playlist_id), video_urls in playlist_groups.items():
+            if playlist_title:
+                # Create playlist-named directory
+                group_dir = create_playlist_directory(
+                    playlist_title,
+                    base_output_dir,
+                    f"playlist_{playlist_id}"
+                )
+                print(f"📁 Created playlist directory: {group_dir.name}")
+            else:
+                # Create timestamped directory for non-playlist videos
+                group_dir = create_timestamped_directory(
+                    "bulk_transcription",
+                    base_output_dir
+                )
+                print(f"📁 Created session directory: {group_dir.name}")
             
-            try:
-                # Get provider for this URL
-                provider = self.downloader.get_provider(url)
+            # Set session_dir to the first directory created (for return value)
+            if session_dir is None:
+                session_dir = group_dir
+            
+            # Process videos in this group
+            for i, url in enumerate(video_urls, 1):
+                total_in_group = len(video_urls)
+                if progress_callback:
+                    progress_callback(i, total_in_group, url)
                 
-                # Generate transcript filename using metadata
-                transcript_filename = self.generate_filename_with_metadata(provider, url)
-                transcript_file = session_dir / transcript_filename
-                
-                # Transcribe the video
-                self.transcriber.transcribe_from_url(url, transcript_file)
-                successful_urls.append(url)
-                
-            except Exception as e:
-                print(f"❌ Failed to process video {i}/{len(expanded_urls)}: {str(e)}")
-                failed_urls.append(url)
-                continue
+                try:
+                    # Get provider for this URL
+                    provider = self.downloader.get_provider(url)
+                    
+                    # Generate transcript filename using metadata
+                    transcript_filename = self.generate_filename_with_metadata(provider, url)
+                    transcript_file = group_dir / transcript_filename
+                    
+                    # Transcribe the video
+                    self.transcriber.transcribe_from_url(url, transcript_file)
+                    successful_urls.append(url)
+                    
+                except Exception as e:
+                    print(f"❌ Failed to process video {i}/{total_in_group}: {str(e)}")
+                    failed_urls.append(url)
+                    continue
         
         # Update bulk file (remove original URLs that had all their videos processed successfully)
-        self._update_bulk_file_with_expansion(bulk_file, urls, successful_urls, expanded_urls)
+        self._update_bulk_file_with_expansion_context(
+            bulk_file, urls, successful_urls, expanded_data
+        )
         
-        return successful_urls, failed_urls, session_dir
+        return successful_urls, failed_urls, session_dir or base_output_dir
     
     def process_bulk_workflow(
         self,
@@ -183,50 +263,8 @@ class BulkProcessor:
         Returns:
             Tuple of (successful_urls, failed_urls, session_directory)
         """
-        urls = load_urls_from_file(bulk_file)
-        if not urls:
-            raise ValueError(f"No URLs found in {bulk_file}")
-        
-        # Expand URLs (playlists/channels into individual videos)
-        print(f"🔍 Expanding URLs...")
-        expanded_urls = self.expand_urls(urls)
-        print(f"📹 Processing {len(expanded_urls)} video(s)")
-        
-        # Create session directory
-        session_dir = create_timestamped_directory(
-            "bulk_processing",
-            output_dir or self.settings.output_dir
-        )
-        
-        successful_urls = []
-        failed_urls = []
-        
-        for i, url in enumerate(expanded_urls, 1):
-            if progress_callback:
-                progress_callback(i, len(expanded_urls), url)
-            
-            try:
-                # Get provider for this URL
-                provider = self.downloader.get_provider(url)
-                
-                # Generate transcript filename using metadata
-                transcript_filename = self.generate_filename_with_metadata(provider, url)
-                transcript_file = session_dir / transcript_filename
-                
-                # Transcribe the video
-                self.transcriber.transcribe_from_url(url, transcript_file)
-                
-                successful_urls.append(url)
-                
-            except Exception as e:
-                print(f"❌ Failed to process video {i}/{len(expanded_urls)}: {str(e)}")
-                failed_urls.append(url)
-                continue
-        
-        # Update bulk file (remove original URLs that had all their videos processed successfully) 
-        self._update_bulk_file_with_expansion(bulk_file, urls, successful_urls, expanded_urls)
-        
-        return successful_urls, failed_urls, session_dir
+        # For now, workflow is just transcription, so delegate to the transcription method
+        return self.process_bulk_transcription(bulk_file, output_dir, progress_callback)
     
     def _update_bulk_file(
         self, 
@@ -288,6 +326,53 @@ class BulkProcessor:
         # Save the remaining URLs back to the bulk file
         save_urls_to_file(bulk_file, remaining_original_urls)
     
+    def _update_bulk_file_with_expansion_context(
+        self, 
+        bulk_file: Path, 
+        original_urls: List[str], 
+        successful_urls: List[str],
+        expanded_data: List[Tuple[str, Optional[str], Optional[str]]]
+    ) -> None:
+        """
+        Update bulk file by removing original URLs whose expanded videos were all processed successfully.
+        
+        Args:
+            bulk_file: Path to the bulk file
+            original_urls: Original list of URLs (may include playlists/channels)
+            successful_urls: Individual video URLs that were processed successfully
+            expanded_data: List of (video_url, playlist_title, playlist_id) tuples
+        """
+        if not successful_urls:
+            return
+            
+        # Build a mapping from original URL to expanded videos
+        original_to_expanded = {}
+        
+        for original_url in original_urls:
+            try:
+                # Get the expanded URLs for this original URL
+                provider = self.downloader.get_provider(original_url)
+                videos_from_this_url = provider.extract_video_urls(original_url)
+                original_to_expanded[original_url] = videos_from_this_url
+            except Exception as e:
+                print(f"⚠️ Error checking expansion for {original_url}: {str(e)}")
+                original_to_expanded[original_url] = [original_url]  # Treat as single video
+        
+        remaining_original_urls = []
+        
+        for original_url in original_urls:
+            videos_from_this_url = original_to_expanded.get(original_url, [original_url])
+            
+            # Check if ALL videos from this original URL were processed successfully
+            all_successful = all(video_url in successful_urls for video_url in videos_from_this_url)
+            
+            if not all_successful:
+                # Keep this original URL if not all its videos were processed
+                remaining_original_urls.append(original_url)
+        
+        # Save the remaining URLs back to the bulk file
+        save_urls_to_file(bulk_file, remaining_original_urls)
+
     @staticmethod
     def print_progress(current: int, total: int, url: str) -> None:
         """

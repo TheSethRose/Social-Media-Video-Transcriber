@@ -7,6 +7,7 @@ This folder contains detailed documentation for the Social Media Video Transcrib
 ### Core Features
 
 - **[Audio Speed Optimization](AUDIO_SPEED_OPTIMIZATION.md)** - Complete guide to the speed optimization feature that reduces transcription time by 50-67% with minimal quality loss.
+- **[Playlist Folder Naming](PLAYLIST_FOLDER_NAMING.md)** - Automatic folder organization based on YouTube playlist titles for better transcript management.
 
 ### Development & Extension
 
@@ -21,6 +22,7 @@ This folder contains detailed documentation for the Social Media Video Transcrib
 ### Getting Started
 - [Main README](../README.md) - Project overview and basic usage
 - [Audio Speed Guide](AUDIO_SPEED_OPTIMIZATION.md) - Learn about the speed optimization feature
+- [Playlist Organization](PLAYLIST_FOLDER_NAMING.md) - Automatic folder naming for playlists
 
 ### For Developers
 - [Adding Providers](ADDING_PROVIDERS.md) - Extend platform support
@@ -30,6 +32,7 @@ This folder contains detailed documentation for the Social Media Video Transcrib
 - **Speed Optimization**: 2x-3x faster transcription with maintained quality
 - **Multi-Platform**: TikTok, YouTube, Facebook, Instagram support
 - **Bulk Processing**: Process multiple videos with threading
+- **Playlist Organization**: Automatic folder naming based on playlist titles
 - **Extensible**: Easy to add new platforms
 
 ## 📝 Contributing to Documentation
