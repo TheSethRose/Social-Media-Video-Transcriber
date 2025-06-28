@@ -66,6 +66,11 @@ def create_workflow_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run benchmark tests on different speed settings with the provided URL"
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose output including real-time transcription words"
+    )
     
     return parser
 
@@ -76,7 +81,8 @@ def workflow_single(
     max_videos: Optional[int] = None,
     max_workers: int = 4,
     speed_multiplier: float = 3.0,
-    run_benchmark: bool = False
+    run_benchmark: bool = False,
+    verbose: bool = False
 ) -> None:
     """
     Process a single video or playlist through the complete workflow.
@@ -122,7 +128,8 @@ def workflow_single(
             # Process using bulk workflow
             successful, failed, output_dir = bulk_processor.process_bulk_workflow(
                 temp_bulk_file,
-                Path("output")
+                Path("output"),
+                verbose=verbose
             )
             
             print(f"✅ Successfully processed: {len(successful)} videos")
@@ -189,7 +196,7 @@ def workflow_single(
         
         # Step 1: Transcribe
         print("📝 Transcribing video...")
-        transcriber.transcribe_from_url(url, transcript_path)
+        transcriber.transcribe_from_url(url, transcript_path, verbose)
         print(f"✅ Transcript saved to: {transcript_path.absolute()}")
         
         print("🎉 Workflow completed successfully!")
@@ -225,7 +232,8 @@ def main() -> None:
             successful_urls, failed_urls, session_dir = processor.process_bulk_workflow(
                 bulk_path,
                 output_path,
-                progress_callback=BulkProcessor.print_progress
+                progress_callback=BulkProcessor.print_progress,
+                verbose=args.verbose
             )
             
             processor.print_summary(
@@ -252,7 +260,8 @@ def main() -> None:
             max_videos=args.max_videos,
             max_workers=args.max_workers,
             speed_multiplier=args.speed,
-            run_benchmark=args.benchmark
+            run_benchmark=args.benchmark,
+            verbose=args.verbose
         )
 
 if __name__ == "__main__":

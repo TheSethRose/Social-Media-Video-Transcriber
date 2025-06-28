@@ -149,7 +149,8 @@ class BulkProcessor:
         self,
         bulk_file: Path,
         output_dir: Optional[Path] = None,
-        progress_callback: Optional[Callable[[int, int, str], None]] = None
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        verbose: bool = False
     ) -> Tuple[List[str], List[str], Path]:
         """
         Process multiple videos for transcription only.
@@ -158,6 +159,7 @@ class BulkProcessor:
             bulk_file: Path to file containing URLs
             output_dir: Optional output directory override
             progress_callback: Optional callback for progress updates
+            verbose: Enable verbose output including real-time transcription
             
         Returns:
             Tuple of (successful_urls, failed_urls, session_directory)
@@ -231,7 +233,7 @@ class BulkProcessor:
                     transcript_file = group_dir / transcript_filename
                     
                     # Transcribe the video
-                    self.transcriber.transcribe_from_url(url, transcript_file)
+                    self.transcriber.transcribe_from_url(url, transcript_file, verbose)
                     successful_urls.append(url)
                     
                 except Exception as e:
@@ -250,7 +252,8 @@ class BulkProcessor:
         self,
         bulk_file: Path,
         output_dir: Optional[Path] = None,
-        progress_callback: Optional[Callable[[int, int, str], None]] = None
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        verbose: bool = False
     ) -> Tuple[List[str], List[str], Path]:
         """
         Process multiple videos for complete workflow (transcription only).
@@ -259,12 +262,13 @@ class BulkProcessor:
             bulk_file: Path to file containing URLs
             output_dir: Optional output directory override
             progress_callback: Optional callback for progress updates
+            verbose: Enable verbose output including real-time transcription
             
         Returns:
             Tuple of (successful_urls, failed_urls, session_directory)
         """
         # For now, workflow is just transcription, so delegate to the transcription method
-        return self.process_bulk_transcription(bulk_file, output_dir, progress_callback)
+        return self.process_bulk_transcription(bulk_file, output_dir, progress_callback, verbose)
     
     def _update_bulk_file(
         self, 

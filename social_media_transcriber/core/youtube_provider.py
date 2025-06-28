@@ -370,6 +370,10 @@ class YouTubeProvider(VideoProvider):
                     cmd.extend(['--playlist-end', str(max_videos * 2)])  # Get extra to filter shorts
                 cmd.extend(['--match-filter', 'duration > 60'])  # Exclude shorts (< 1 minute)
             
+            # For playlists, limit to max_videos if specified
+            if url_type == 'playlist' and max_videos:
+                cmd.extend(['--playlist-end', str(max_videos)])
+            
             cmd.append(url)
             
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -379,6 +383,11 @@ class YouTubeProvider(VideoProvider):
             if url_type == 'channel' and max_videos and len(video_urls) > max_videos:
                 video_urls = video_urls[:max_videos]
                 logger.info(f"Limited channel results to {max_videos} videos (excluding shorts)")
+            
+            # Apply final limit for playlists
+            if url_type == 'playlist' and max_videos and len(video_urls) > max_videos:
+                video_urls = video_urls[:max_videos]
+                logger.info(f"Limited playlist to {max_videos} videos")
             
             if not video_urls:
                 logger.warning(f"No videos found for URL: {url}")

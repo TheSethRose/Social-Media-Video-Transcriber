@@ -57,6 +57,7 @@ def create_main_parser() -> argparse.ArgumentParser:
     workflow_parser.add_argument("--max-workers", type=int, default=4, help="Maximum number of concurrent workers (default: 4)")
     workflow_parser.add_argument("--speed", type=float, default=3.0, help="Audio speed multiplier (1.0=normal, 2.0=2x, 3.0=3x - default: 3.0)")
     workflow_parser.add_argument("--benchmark", action="store_true", help="Run benchmark tests on different speed settings")
+    workflow_parser.add_argument("--verbose", action="store_true", help="Enable verbose output including real-time transcription words")
     
     return parser
 
@@ -126,6 +127,8 @@ def main() -> None:
             sys.argv.extend(["--speed", str(args.speed)])
         if hasattr(args, 'benchmark') and args.benchmark:
             sys.argv.append("--benchmark")
+        if hasattr(args, 'verbose') and args.verbose:
+            sys.argv.append("--verbose")
         
         workflow_main()
 

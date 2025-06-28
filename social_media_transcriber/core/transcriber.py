@@ -41,7 +41,7 @@ class AudioTranscriber:
         self.settings.audio_speed_multiplier = speed_multiplier
         print(f"🎛️ Audio speed multiplier set to {speed_multiplier}x")
 
-    def transcribe_audio(self, audio_file: Path, output_file: Path) -> Path:
+    def transcribe_audio(self, audio_file: Path, output_file: Path, verbose: bool = False) -> Path:
         """
         Transcribe audio file to text using Parakeet-MLX with speed optimization.
         
@@ -52,6 +52,7 @@ class AudioTranscriber:
         Args:
             audio_file: Path to the audio file (any format supported by ffmpeg)
             output_file: Path for the output transcript file
+            verbose: Enable verbose output including real-time transcription words
             
         Returns:
             Path to the generated transcript file
@@ -88,7 +89,19 @@ class AudioTranscriber:
                 "--output-template", output_file.stem
             ]
             
-            proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            if verbose:
+                print(f"🎤 Starting transcription with real-time output...")
+                print(f"📝 Words will appear below as they are transcribed:")
+                print("─" * 60)
+                
+                # Run with real-time output visible
+                proc = subprocess.run(cmd, check=True, text=True)
+                
+                print("─" * 60)
+                print("✅ Transcription completed!")
+            else:
+                # Run quietly as before
+                proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
             
             if not output_file.exists():
                 raise FileNotFoundError(f"Transcription failed: {output_file} not found")
@@ -106,13 +119,14 @@ class AudioTranscriber:
                     except OSError:
                         pass  # Directory not empty or other issue
     
-    def transcribe_from_url(self, url: str, output_file: Path) -> Path:
+    def transcribe_from_url(self, url: str, output_file: Path, verbose: bool = False) -> Path:
         """
         Download video and transcribe its audio.
         
         Args:
             url: Video URL (TikTok, YouTube, etc.)
             output_file: Path for the output transcript file
+            verbose: Enable verbose output including real-time transcription
             
         Returns:
             Path to the generated transcript file
@@ -125,7 +139,7 @@ class AudioTranscriber:
         
         try:
             # Transcribe the audio
-            return self.transcribe_audio(audio_file, output_file)
+            return self.transcribe_audio(audio_file, output_file, verbose)
         finally:
             # Clean up temporary audio file
             if audio_file.exists():
