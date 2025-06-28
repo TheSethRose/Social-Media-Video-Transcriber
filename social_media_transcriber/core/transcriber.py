@@ -94,7 +94,10 @@ class AudioTranscriber:
                 print(f"📝 Words will appear below as they are transcribed:")
                 print("─" * 60)
                 
-                # Run with real-time output visible
+                # Add verbose flag to parakeet-mlx and run with real-time output
+                cmd.append("--verbose")
+                
+                # Run with real-time output by not capturing stdout/stderr
                 proc = subprocess.run(cmd, check=True, text=True)
                 
                 print("─" * 60)
