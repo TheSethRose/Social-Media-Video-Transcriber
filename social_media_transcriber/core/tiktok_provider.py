@@ -176,6 +176,11 @@ class TikTokProvider(VideoProvider):
                     video_urls.append(line)
             
             logger.info(f"Extracted {len(video_urls)} videos from TikTok user: {url}")
+            
+            # Note: TikTok videos can be very short (1-15 seconds) which is normal
+            if video_urls:
+                logger.info(f"Note: TikTok videos may be very short and contain minimal speech content")
+            
             return video_urls
             
         except subprocess.CalledProcessError as e:

@@ -269,6 +269,12 @@ python main.py workflow "https://www.tiktok.com/@username" --max-videos 10
 #     └── ... (up to 20 recent videos)
 ```
 
+**Note about TikTok Videos:**
+- TikTok videos are typically very short (15-60 seconds)
+- Many focus on visual content with minimal speech
+- Some transcripts may be very brief (1-3 words) which is normal
+- Videos with no speech will produce empty or minimal transcripts
+
 ### Custom Output Directories
 
 ```bash
