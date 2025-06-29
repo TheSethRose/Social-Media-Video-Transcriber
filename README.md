@@ -137,15 +137,20 @@ output/
 
 ### Currently Supported
 - **TikTok** - Individual videos with metadata extraction
+- **TikTok** - Individual videos and user profiles/channels (using yt-dlp)
 - **YouTube** - Videos, playlists, channels (using yt-dlp)
 - **Facebook** - Videos, Reels, and fb.watch URLs
 - **Instagram** - Posts, Reels, IGTV, and Stories
 
 ### URL Patterns
 ```bash
-# TikTok
+# TikTok Videos
 https://www.tiktok.com/@user/video/123456789
 https://vm.tiktok.com/SHORTURL
+
+# TikTok User Profiles/Channels (processes recent videos)
+https://www.tiktok.com/@username
+https://www.tiktok.com/user/username
 
 # YouTube Videos  
 https://www.youtube.com/watch?v=VIDEO_ID
@@ -212,6 +217,7 @@ output/
 https://www.youtube.com/watch?v=dQw4w9WgXcQ
 https://www.youtube.com/playlist?list=PLrAXtmRdnEQy6nuLMt095B1GdUhWDj0n7
 https://www.tiktok.com/@user/video/123456789
+https://www.tiktok.com/@sabrina_ramonov  # TikTok user profile
 https://www.facebook.com/reel/2443188852722500
 https://www.instagram.com/p/POST_ID
 ```
@@ -244,6 +250,23 @@ python main.py transcribe "https://www.youtube.com/playlist?list=PLAYLIST_ID"
 echo "https://www.youtube.com/playlist?list=PLAYLIST_1" > playlists.txt
 echo "https://www.youtube.com/playlist?list=PLAYLIST_2" >> playlists.txt
 python main.py transcribe --bulk --bulk-file playlists.txt
+```
+
+### TikTok Channel Processing
+
+```bash
+# Process recent videos from a TikTok user profile
+python main.py workflow "https://www.tiktok.com/@sabrina_ramonov"
+
+# Limit to specific number of videos (default: 20)
+python main.py workflow "https://www.tiktok.com/@username" --max-videos 10
+
+# Example output structure:
+# output/
+# └── TikTok @sabrina_ramonov/
+#     ├── video1_transcript.txt
+#     ├── video2_transcript.txt
+#     └── ... (up to 20 recent videos)
 ```
 
 ### Custom Output Directories

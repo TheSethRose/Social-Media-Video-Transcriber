@@ -3,6 +3,7 @@
 # 
 # Examples:
 # https://www.tiktok.com/@username/video/1234567890
+# https://www.tiktok.com/@username  # TikTok user profile (channel)
 # https://www.youtube.com/watch?v=VIDEO_ID
 # https://www.youtube.com/playlist?list=PLAYLIST_ID
 # https://www.youtube.com/@channel_name
@@ -14,3 +15,4 @@
 #
 # Remove the # from the URLs below to test:
 # https://www.youtube.com/watch?v=8idr1WZ1A7Q&list=PLZHQObOWTQDOjmo3Y6ADm0ScWAlEXf-fp
+# https://www.tiktok.com/@sabrina_ramonov  # Example TikTok channel

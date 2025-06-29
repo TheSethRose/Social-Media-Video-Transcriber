@@ -99,8 +99,12 @@ def workflow_single(
     from ..core.youtube_provider import YouTubeProvider
     from ..utils.bulk_processor import BulkProcessor
     from ..utils.file_utils import create_timestamped_directory
+    from ..core.youtube_provider import YouTubeProvider
+    from ..core.tiktok_provider import TikTokProvider
     
-    # Check if this is a YouTube playlist/channel that needs expansion
+    # Check if this is a playlist/channel that needs expansion
+    
+    # YouTube playlist/channel detection
     youtube_provider = YouTubeProvider()
     if youtube_provider.validate_url(url) and youtube_provider.is_playlist_url(url):
         url_type = youtube_provider.get_url_type(url)
@@ -120,6 +124,49 @@ def workflow_single(
         
         # Create a temporary file with the video URLs
         temp_bulk_file = Path("temp_playlist_urls.txt")
+        try:
+            with open(temp_bulk_file, 'w') as f:
+                for video_url in video_urls:
+                    f.write(f"{video_url}\n")
+            
+            # Process using bulk workflow
+            successful, failed, output_dir = bulk_processor.process_bulk_workflow(
+                temp_bulk_file,
+                Path("output"),
+                verbose=verbose
+            )
+            
+            print(f"✅ Successfully processed: {len(successful)} videos")
+            if failed:
+                print(f"❌ Failed to process: {len(failed)} videos")
+                
+        finally:
+            # Clean up temp file
+            if temp_bulk_file.exists():
+                temp_bulk_file.unlink()
+        
+        return
+    
+    # TikTok user profile detection
+    tiktok_provider = TikTokProvider()
+    if tiktok_provider.validate_url(url) and tiktok_provider.is_playlist_url(url):
+        url_type = tiktok_provider.get_url_type(url)
+        print(f"🎯 Detected TikTok {url_type}: {url}")
+        
+        # Extract individual video URLs
+        video_urls = tiktok_provider.extract_video_urls(url, max_videos=max_videos)
+        if not video_urls:
+            print("❌ No videos found in user profile")
+            return
+        
+        print(f"📋 Found {len(video_urls)} videos to process")
+        print(f"🚀 Using {max_workers} workers for parallel processing")
+        
+        # Use bulk processing for multiple videos
+        bulk_processor = BulkProcessor(settings, max_workers=max_workers)
+        
+        # Create a temporary file with the video URLs
+        temp_bulk_file = Path("temp_tiktok_urls.txt")
         try:
             with open(temp_bulk_file, 'w') as f:
                 for video_url in video_urls:

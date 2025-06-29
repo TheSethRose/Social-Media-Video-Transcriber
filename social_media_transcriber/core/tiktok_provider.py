@@ -1,5 +1,5 @@
 """
-TikTok video provider implementation.
+TikTok video provider implementation with channel/user profile support.
 """
 
 import re
@@ -8,7 +8,7 @@ import tempfile
 import logging
 import json
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from ..config.settings import Settings
 from .providers import VideoProvider
@@ -16,7 +16,7 @@ from .providers import VideoProvider
 logger = logging.getLogger(__name__)
 
 class TikTokProvider(VideoProvider):
-    """TikTok video provider using yt-dlp."""
+    """TikTok video provider using yt-dlp with support for individual videos and user profiles."""
     
     def __init__(self, settings: Optional[Settings] = None):
         """Initialize TikTok provider."""
@@ -48,18 +48,251 @@ class TikTokProvider(VideoProvider):
         ]
     
     def validate_url(self, url: str) -> bool:
-        """Validate if URL is a TikTok URL."""
+        """Validate if URL is a TikTok URL (video or user profile)."""
         try:
             return any(domain in url.lower() for domain in self.supported_domains)
         except Exception:
             return False
     
+    def is_playlist_url(self, url: str) -> bool:
+        """Check if URL is a TikTok user profile (equivalent to a playlist)."""
+        if not self.validate_url(url):
+            return False
+        return self.get_url_type(url) == 'user'
+    
+    def get_url_type(self, url: str) -> str:
+        """
+        Determine the type of TikTok URL.
+        
+        Returns:
+            'video' for individual video URLs
+            'user' for user profile URLs
+            'unknown' for unrecognized URLs
+        """
+        if not self.validate_url(url):
+            return 'unknown'
+        
+        try:
+            # User profile patterns: @username or user/username
+            if re.search(r'tiktok\.com/@[^/]+/?$', url) or re.search(r'tiktok\.com/user/[^/]+/?$', url):
+                return 'user'
+            
+            # Video patterns: @username/video/123 or vm.tiktok.com/shortcode
+            if re.search(r'tiktok\.com/@[^/]+/video/\d+', url) or re.search(r'vm\.tiktok\.com/[a-zA-Z0-9]+', url):
+                return 'video'
+            
+            return 'unknown'
+        except Exception:
+            return 'unknown'
+    
+    def extract_username(self, url: str) -> str:
+        """Extract username from TikTok user profile URL."""
+        if not self.validate_url(url):
+            raise ValueError(f"Invalid TikTok URL: {url}")
+        
+        try:
+            # Pattern for @username URLs
+            match = re.search(r'tiktok\.com/@([^/]+)', url)
+            if match:
+                return match.group(1)
+            
+            # Pattern for user/username URLs
+            match = re.search(r'tiktok\.com/user/([^/]+)', url)
+            if match:
+                return match.group(1)
+            
+            raise ValueError(f"Could not extract username from URL: {url}")
+            
+        except Exception as e:
+            raise ValueError(f"Could not extract username from URL: {url}") from e
+    
+    def extract_video_urls(self, url: str, max_videos: Optional[int] = None) -> List[str]:
+        """
+        Extract individual video URLs from user profile or return single video URL.
+        
+        Args:
+            url: TikTok URL (video or user profile)
+            max_videos: Maximum number of videos to extract from user profile
+        
+        Returns:
+            List of video URLs
+        """
+        if not self.validate_url(url):
+            return []
+        
+        url_type = self.get_url_type(url)
+        
+        if url_type == 'video':
+            return [url]
+        
+        if url_type == 'user':
+            return self.extract_user_videos(url, max_videos)
+        
+        # If we can't determine the type, treat as single video
+        return [url]
+    
+    def extract_user_videos(self, url: str, max_videos: Optional[int] = None) -> List[str]:
+        """
+        Extract all videos from a TikTok user profile.
+        
+        Args:
+            url: TikTok user profile URL (e.g., https://www.tiktok.com/@username)
+            max_videos: Maximum number of videos to extract
+            
+        Returns:
+            List of individual video URLs
+        """
+        if not self.validate_url(url):
+            return []
+        
+        url_type = self.get_url_type(url)
+        if url_type != 'user':
+            raise ValueError(f"URL is not a user profile URL: {url}")
+        
+        # Set default limit for user profiles to prevent processing thousands of videos
+        if max_videos is None:
+            max_videos = 20
+            logger.info(f"TikTok user profile detected, limiting to {max_videos} recent videos (use max_videos parameter to change)")
+        
+        try:
+            cmd = [
+                'yt-dlp',
+                '--flat-playlist',
+                '--print', 'webpage_url',
+                '--no-warnings'
+            ]
+            
+            if max_videos:
+                cmd.extend(['--playlist-end', str(max_videos)])
+            
+            cmd.append(url)
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            
+            video_urls = []
+            for line in result.stdout.strip().split('\n'):
+                line = line.strip()
+                if line and self.validate_url(line):
+                    video_urls.append(line)
+            
+            logger.info(f"Extracted {len(video_urls)} videos from TikTok user: {url}")
+            return video_urls
+            
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Error extracting videos from TikTok user {url}: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error extracting videos from TikTok user {url}: {e}")
+            return []
+    
+    def get_playlist_metadata(self, url: str) -> Dict[str, Any]:
+        """
+        Get TikTok user profile metadata.
+        
+        Args:
+            url: TikTok user profile URL
+            
+        Returns:
+            Dictionary containing user metadata
+        """
+        if not self.validate_url(url):
+            return {
+                'title': 'TikTok User',
+                'playlist_id': 'unknown',
+                'uploader': None,
+                'description': None,
+                'video_count': 0
+            }
+        
+        url_type = self.get_url_type(url)
+        if url_type != 'user':
+            return {
+                'title': 'TikTok Video',
+                'playlist_id': 'unknown',
+                'uploader': None,
+                'description': None,
+                'video_count': 0
+            }
+        
+        try:
+            username = self.extract_username(url)
+            
+            # Try to get user metadata using yt-dlp
+            cmd = [
+                'yt-dlp',
+                '--dump-json',
+                '--flat-playlist',
+                '--playlist-end', '1',  # Just get metadata, not all videos
+                '--no-warnings',
+                url
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            
+            # Parse the first line of JSON output
+            lines = result.stdout.strip().split('\n')
+            if lines and lines[0].strip():
+                try:
+                    metadata = json.loads(lines[0])
+                    
+                    return {
+                        'title': metadata.get('uploader', metadata.get('playlist_uploader', f"TikTok @{username}")),
+                        'playlist_id': username,
+                        'uploader': metadata.get('uploader', metadata.get('playlist_uploader', username)),
+                        'description': metadata.get('description', metadata.get('playlist_description')),
+                        'video_count': metadata.get('playlist_count', 0)
+                    }
+                except json.JSONDecodeError:
+                    pass
+            
+            # Fallback to basic metadata
+            return {
+                'title': f"TikTok @{username}",
+                'playlist_id': username,
+                'uploader': username,
+                'description': None,
+                'video_count': 0
+            }
+            
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Error getting TikTok user metadata for {url}: {e}")
+            try:
+                username = self.extract_username(url)
+                return {
+                    'title': f"TikTok @{username}",
+                    'playlist_id': username,
+                    'uploader': username,
+                    'description': None,
+                    'video_count': 0
+                }
+            except Exception:
+                return {
+                    'title': 'TikTok User',
+                    'playlist_id': 'unknown',
+                    'uploader': None,
+                    'description': None,
+                    'video_count': 0
+                }
+        except Exception as e:
+            logger.error(f"Unexpected error getting TikTok user metadata for {url}: {e}")
+            return {
+                'title': 'TikTok User',
+                'playlist_id': 'unknown',
+                'uploader': None,
+                'description': None,
+                'video_count': 0
+            }
+
     def extract_video_id(self, url: str) -> str:
         """Extract video ID from TikTok URL."""
         if not self.validate_url(url):
             raise ValueError(f"Invalid TikTok URL: {url}")
         
         try:
+            # For user profile URLs, use the username as ID
+            if self.get_url_type(url) == 'user':
+                return self.extract_username(url)
+            
             # Pattern for regular TikTok videos: @username/video/1234567890
             pattern = r'tiktok\.com/@[^/]+/video/(\d+)'
             match = re.search(pattern, url)
