@@ -1,26 +1,28 @@
+# setup.py
 """
-Setup script for TikTok Transcribe & Thread Generator package.
+Setup script for the Social Media Transcriber package.
 """
 
-from setuptools import setup, find_packages
 from pathlib import Path
 
-# Read the README file
+from setuptools import find_packages, setup
+
+# Read the README file for the long description
 this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
 
 setup(
-    name="tiktok-transcribe",
-    version="1.0.0",
+    name="social-media-transcriber",
+    version="2.0.0",  # Bump version for new architecture
     author="Your Name",
     author_email="your.email@example.com",
-    description="A Python package for downloading TikTok videos, transcribing audio, and generating Twitter threads",
+    description="A Python tool for downloading and transcribing videos from multiple social media platforms.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/tiktok-transcribe",
+    url="https://github.com/yourusername/social-media-transcriber",
     packages=find_packages(),
     classifiers=[
-        "Development Status :: 4 - Beta",
+        "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Operating System :: MacOS :: MacOS X",
@@ -31,18 +33,19 @@ setup(
         "Programming Language :: Python :: 3.11",
         "Topic :: Multimedia :: Video",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        "Topic :: Text Processing :: Linguistic",
     ],
     python_requires=">=3.8",
     install_requires=[
         "yt-dlp>=2023.1.6",
         "requests>=2.28.0",
         "parakeet-mlx>=0.1.0",
+        "click>=8.0.0",
+        "mlx",
     ],
     entry_points={
         "console_scripts": [
-            "tiktok-transcribe=social_media_transcriber.cli.workflow_cli:main",
-            "tiktok-transcribe-only=social_media_transcriber.cli.transcribe_cli:main",
-            "tiktok-thread=social_media_transcriber.cli.thread_cli:main",
+            "transcriber=social_media_transcriber.cli:cli",
         ],
     },
     include_package_data=True,

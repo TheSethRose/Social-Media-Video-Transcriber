@@ -1,66 +1,88 @@
+# social_media_transcriber/core/downloader.py
 """
-Video downloader module with provider support.
+Video downloader module responsible for identifying and delegating to the
+correct video provider.
 """
+import importlib
+import inspect
+import logging
+import pkgutil
+from typing import List, Optional
 
-from pathlib import Path
-from typing import Optional
+from . import providers
+from .providers.base import BaseYtDlpProvider, VideoProvider
 
-from ..config.settings import Settings
-from .providers import VideoProvider
-from .youtube_provider import YouTubeProvider
-from .tiktok_provider import TikTokProvider
-from .facebook_provider import FacebookProvider
-from .instagram_provider import InstagramProvider
+# Configure logging
+logger = logging.getLogger(__name__)
 
-"""
-Video downloader module with provider support.
-"""
 
-from pathlib import Path
-from typing import Optional
+class Downloader:
+    """
+    A universal downloader that delegates to the appropriate provider.
 
-from ..config.settings import Settings
-from .providers import VideoProvider
-from .youtube_provider import YouTubeProvider
-from .tiktok_provider import TikTokProvider
-from .facebook_provider import FacebookProvider
-from .instagram_provider import InstagramProvider
+    This class dynamically discovers and loads all available `VideoProvider`
+    implementations from the `social_media_transcriber.core.providers` package.
+    """
 
-class VideoDownloader:
-    """Universal video downloader that supports multiple providers."""
-    
-    def __init__(self, settings: Optional[Settings] = None):
-        """Initialize the downloader with available providers."""
-        self.settings = settings or Settings()
-        self.providers = {
-            "tiktok": TikTokProvider(self.settings),
-            "youtube": YouTubeProvider(),
-            "facebook": FacebookProvider(),
-            "instagram": InstagramProvider()
-        }
-    
-    def get_provider(self, url: str) -> VideoProvider:
-        """Get the appropriate provider for a URL."""
-        for provider in self.providers.values():
+    def __init__(self) -> None:
+        """Initializes the downloader and dynamically loads all providers."""
+        self._providers: List[VideoProvider] = self._discover_providers()
+        provider_names = sorted([p.provider_name for p in self._providers])
+        if not self._providers:
+            logger.warning("No video providers were found or loaded.")
+        else:
+            logger.info(
+                "Downloader initialized with %d providers: %s",
+                len(provider_names),
+                ", ".join(provider_names),
+            )
+
+    def _discover_providers(self) -> List[VideoProvider]:
+        """
+        Find and instantiate all VideoProvider classes in the providers package.
+
+        Returns:
+            A list of instantiated video provider objects.
+        """
+        discovered_providers = []
+        # Get the path and name of the 'providers' package to search within.
+        package_path = providers.__path__
+        package_name = providers.__name__
+
+        # Iterate over all modules in the 'providers' package.
+        for _, module_name, _ in pkgutil.iter_modules(package_path, prefix=f"{package_name}."):
+            try:
+                # Dynamically import the discovered module.
+                module = importlib.import_module(module_name)
+                # Look for classes within the module that are providers.
+                for _, obj in inspect.getmembers(module, inspect.isclass):
+                    # A class is a provider if it inherits from VideoProvider but
+                    # is not VideoProvider or BaseYtDlpProvider itself.
+                    if (
+                        issubclass(obj, VideoProvider)
+                        and obj is not VideoProvider
+                        and obj is not BaseYtDlpProvider
+                    ):
+                        discovered_providers.append(obj())
+            except Exception as e:
+                logger.error("Failed to load provider from module %s: %s", module_name, e)
+
+        return discovered_providers
+
+    def get_provider(self, url: str) -> Optional[VideoProvider]:
+        """
+        Finds a suitable provider for the given URL.
+
+        Args:
+            url: The URL to find a provider for.
+
+        Returns:
+            An instance of a supported VideoProvider, or None if no provider
+            is found.
+        """
+        for provider in self._providers:
             if provider.validate_url(url):
+                logger.info("Provider '%s' selected for URL: %s", provider.provider_name, url)
                 return provider
-        
-        raise ValueError(f"No supported provider found for URL: {url}")
-    
-    def download_video(self, url: str, output_file: Optional[Path] = None) -> Path:
-        """Download a video using the appropriate provider."""
-        provider = self.get_provider(url)
-        return provider.download_video(url, output_file)
-    
-    def download_audio_only(self, url: str, output_file: Optional[Path] = None) -> Path:
-        """Download audio using the appropriate provider."""
-        provider = self.get_provider(url)
-        return provider.download_audio_only(url, output_file)
-    
-    def extract_video_id(self, url: str) -> str:
-        """Extract video ID using the appropriate provider."""
-        provider = self.get_provider(url)
-        return provider.extract_video_id(url)
-
-# Backward compatibility alias
-TikTokDownloader = VideoDownloader
+        logger.warning("No supported provider found for URL: %s", url)
+        return None

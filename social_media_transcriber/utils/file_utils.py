@@ -6,6 +6,7 @@ import re
 import datetime
 import subprocess
 import tempfile
+import glob
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
@@ -494,3 +495,107 @@ def process_audio_for_transcription(
         
         error_msg = f"ffmpeg failed to process audio: {e.stderr if e.stderr else str(e)}"
         raise subprocess.CalledProcessError(e.returncode, cmd, error_msg)
+
+def combine_transcripts_in_channel_folder(channel_folder: Path, output_file: Path) -> None:
+    """
+    Combine all transcript files in a channel folder into a single file.
+    
+    Args:
+        channel_folder: Path to the channel folder containing transcript files
+        output_file: Path to the output file where combined transcript will be saved
+        
+    Raises:
+        FileNotFoundError: If the channel folder doesn't exist
+    """
+    if not channel_folder.exists() or not channel_folder.is_dir():
+        raise FileNotFoundError(f"Channel folder not found: {channel_folder}")
+    
+    # Glob pattern to match all transcript files in the channel folder
+    transcript_pattern = channel_folder / "*.txt"
+    
+    # Open the output file
+    with open(output_file, 'w', encoding='utf-8') as outfile:
+        # Iterate over all transcript files in the channel folder
+        for transcript_file in transcript_pattern.glob("*.txt"):
+            if transcript_file.is_file():
+                # Write a separator line with the source file name
+                outfile.write(f"\n\n===== Transcript from {transcript_file.name} =====\n\n")
+                
+                # Read and append the content of each transcript file
+                with open(transcript_file, 'r', encoding='utf-8') as infile:
+                    outfile.write(infile.read())
+    
+    print(f"Combined transcript saved to: {output_file}")
+
+def combine_channel_transcripts(output_dir: Path, channel_name: Optional[str] = None) -> Dict[str, str]:
+    """
+    Combine all transcript files in each channel folder into a single file per channel.
+    
+    Args:
+        output_dir: Path to the output directory containing channel folders
+        channel_name: Optional specific channel name to process (if None, processes all)
+        
+    Returns:
+        Dictionary mapping channel names to combined file paths
+    """
+    results = {}
+    
+    if not output_dir.exists():
+        print(f"Output directory {output_dir} does not exist")
+        return results
+    
+    # Get all channel directories
+    if channel_name:
+        channel_dirs = [output_dir / channel_name] if (output_dir / channel_name).exists() else []
+    else:
+        channel_dirs = [d for d in output_dir.iterdir() if d.is_dir() and d.name not in ['transcripts', 'threads']]
+    
+    for channel_dir in channel_dirs:
+        channel_name = channel_dir.name
+        print(f"Processing channel: {channel_name}")
+        
+        # Find all transcript files in this channel
+        transcript_files = list(channel_dir.glob("*_transcript.txt"))
+        
+        if not transcript_files:
+            print(f"No transcript files found in {channel_name}")
+            continue
+        
+        # Sort files by name for consistent ordering
+        transcript_files.sort()
+        
+        # Create combined file path
+        combined_file = output_dir / f"{channel_name}_combined.txt"
+        
+        try:
+            with open(combined_file, 'w', encoding='utf-8') as outfile:
+                # Write header
+                outfile.write(f"# Combined Transcripts for {channel_name}\n")
+                outfile.write(f"Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                outfile.write(f"Total videos: {len(transcript_files)}\n")
+                outfile.write("=" * 80 + "\n\n")
+                
+                for i, transcript_file in enumerate(transcript_files, 1):
+                    try:
+                        with open(transcript_file, 'r', encoding='utf-8') as infile:
+                            content = infile.read().strip()
+                            
+                            # Write separator and file info
+                            outfile.write(f"## Video {i}/{len(transcript_files)}: {transcript_file.name}\n")
+                            outfile.write("-" * 60 + "\n")
+                            outfile.write(content)
+                            outfile.write("\n\n")
+                            
+                    except Exception as e:
+                        print(f"Error reading {transcript_file}: {e}")
+                        outfile.write(f"## Video {i}/{len(transcript_files)}: {transcript_file.name}\n")
+                        outfile.write("-" * 60 + "\n")
+                        outfile.write(f"Error reading file: {e}\n\n")
+            
+            results[channel_name] = str(combined_file)
+            print(f"✅ Combined {len(transcript_files)} transcripts for {channel_name} -> {combined_file}")
+            
+        except Exception as e:
+            print(f"❌ Error creating combined file for {channel_name}: {e}")
+    
+    return results

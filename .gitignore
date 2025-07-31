@@ -1,4 +1,8 @@
 # Python
+.gitignore
+.git/
+.venv/
+venv/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -68,3 +72,16 @@ logs/
 temp/
 tmp/
 *.tmp
+
+# Jupyter Notebooks (analysis files)
+*.ipynb
+!docs/*.ipynb
+
+# Temporary scripts
+combine_transcripts.py
+bulk_channels.txt
+test_*.py
+analyze_*.py
+
+generate.py
+output.md

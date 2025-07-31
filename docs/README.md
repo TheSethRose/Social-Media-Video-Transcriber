@@ -11,6 +11,7 @@ This folder contains detailed documentation for the Social Media Video Transcrib
 
 ### Development & Extension
 
+- **[Testing Guide](TESTING_GUIDE.md)** - How to run the project's test suite using pytest.
 - **[Adding Providers](ADDING_PROVIDERS.md)** - Step-by-step guide for adding support for new video platforms and social media sites.
 
 ### Implementation Details
@@ -20,15 +21,18 @@ This folder contains detailed documentation for the Social Media Video Transcrib
 ## 🚀 Quick Links
 
 ### Getting Started
+
 - [Main README](../README.md) - Project overview and basic usage
 - [Audio Speed Guide](AUDIO_SPEED_OPTIMIZATION.md) - Learn about the speed optimization feature
 - [Playlist Organization](PLAYLIST_FOLDER_NAMING.md) - Automatic folder naming for playlists
 
 ### For Developers
+
 - [Adding Providers](ADDING_PROVIDERS.md) - Extend platform support
 - [Implementation Summary](IMPLEMENTATION_SUMMARY.md) - Technical details
 
 ### Key Features
+
 - **Speed Optimization**: 2x-3x faster transcription with maintained quality
 - **Multi-Platform**: TikTok, YouTube, Facebook, Instagram support
 - **Bulk Processing**: Process multiple videos with threading

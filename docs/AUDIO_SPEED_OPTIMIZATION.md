@@ -5,6 +5,7 @@ This implementation adds audio speed optimization to the TikTok Transcriber, fol
 ## 🚀 What's New
 
 ### Speed Optimization Feature
+
 - **Audio Speed Processing**: Automatically speeds up audio before transcription using ffmpeg
 - **Configurable Speed**: Choose from 1.0x (normal) to 3.0x+ speeds
 - **Pitch Preservation**: Maintains natural speech pitch for better transcription quality
@@ -12,6 +13,7 @@ This implementation adds audio speed optimization to the TikTok Transcriber, fol
 - **Quality Maintained**: Minimal transcription quality loss at recommended speeds
 
 ### Performance Benefits
+
 - **2x Speed**: ~50% reduction in transcription time with minimal quality loss
 - **3x Speed**: ~67% reduction in transcription time with acceptable quality
 - **Token Efficiency**: Fewer tokens processed due to shorter audio duration
@@ -21,25 +23,22 @@ This implementation adds audio speed optimization to the TikTok Transcriber, fol
 
 ### Command Line Options
 
-All commands now support the `--speed` parameter:
+The `run` command supports the `--speed` parameter:
 
 ```bash
 # Default 3x speed optimization
-python main.py workflow "https://www.youtube.com/watch?v=VIDEO_ID"
+transcriber run "[https://www.youtube.com/watch?v=VIDEO_ID](https://www.youtube.com/watch?v=VIDEO_ID)"
 
 # Custom speed settings
-python main.py workflow "https://www.youtube.com/watch?v=VIDEO_ID" --speed 2.0
-python main.py workflow "https://www.youtube.com/watch?v=VIDEO_ID" --speed 1.0  # No optimization
-
-# Transcription with speed optimization
-python main.py transcribe "https://www.youtube.com/watch?v=VIDEO_ID" --speed 3.0
+transcriber run "[https://www.youtube.com/watch?v=VIDEO_ID](https://www.youtube.com/watch?v=VIDEO_ID)" --speed 2.0
+transcriber run "[https://www.youtube.com/watch?v=VIDEO_ID](https://www.youtube.com/watch?v=VIDEO_ID)" --speed 1.0  # No optimization
 
 # Bulk processing with speed optimization
-python main.py workflow --bulk --bulk-file urls.txt --speed 3.0
+transcriber run --file urls.txt --speed 3.0
 
 # Benchmark different speeds
-python main.py workflow "https://www.youtube.com/watch?v=VIDEO_ID" --benchmark
-```
+transcriber run "[https://www.youtube.com/watch?v=VIDEO_ID](https://www.youtube.com/watch?v=VIDEO_ID)" --benchmark
+````
 
 ### Programmatic Usage
 
@@ -143,6 +142,7 @@ AUDIO_CHANNELS = 1            # Mono audio
 ### System Dependencies
 
 - **FFmpeg**: Required for audio processing
+
   ```bash
   # macOS
   brew install ffmpeg

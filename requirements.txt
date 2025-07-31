@@ -1,5 +1,7 @@
+# requirements.txt
 mlx
 parakeet-mlx
 yt-dlp
 requests
-
+click
+pytest
