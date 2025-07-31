@@ -14,12 +14,12 @@ long_description = (this_directory / "README.md").read_text()
 setup(
     name="social-media-transcriber",
     version="2.0.0",  # Bump version for new architecture
-    author="Your Name",
-    author_email="your.email@example.com",
+    author="Seth Rose",
+    author_email="admin@sethrose.dev",
     description="A Python tool for downloading and transcribing videos from multiple social media platforms.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/social-media-transcriber",
+    url="https://github.com/thesethrose/social-media-transcriber",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 5 - Production/Stable",
