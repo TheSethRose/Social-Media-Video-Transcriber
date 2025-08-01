@@ -44,9 +44,20 @@ class Settings:
 
         # CLI options take precedence over environment variables for output_dir
         if output_dir:
-            self.output_dir = output_dir
+            self.output_dir = output_dir.resolve() if not output_dir.is_absolute() else output_dir
         else:
-            self.output_dir = Path(os.getenv("DEFAULT_OUTPUT_DIR", FALLBACK_OUTPUT_DIR))
+            # Get the default output directory from environment or use fallback
+            default_output_str = os.getenv("DEFAULT_OUTPUT_DIR", FALLBACK_OUTPUT_DIR)
+            default_output = Path(default_output_str)
+            
+            if default_output.is_absolute():
+                self.output_dir = default_output
+            else:
+                # For relative paths, resolve them relative to the project root
+                # Find project root by looking from the settings.py file location
+                settings_file = Path(__file__).resolve()
+                project_root = settings_file.parent.parent.parent  # Go up 3 levels from config/settings.py
+                self.output_dir = (project_root / default_output).resolve()
 
         # Non-environment settings
         self.bulk_file = bulk_file or "bulk.txt"
