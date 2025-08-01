@@ -1,4 +1,7 @@
 # Python
+.env
+.pytest_cache/
+social_media_transcriber.egg-info/
 .gitignore
 .git/
 .venv/

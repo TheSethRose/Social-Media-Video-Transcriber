@@ -1,9 +1,5 @@
-# social_media_transcriber/cli.py
 """
 Command-line interface for the Social Media Transcriber.
-
-This module provides a unified CLI for all application functionality,
-built using the Click library.
 """
 
 import logging
@@ -11,6 +7,10 @@ from pathlib import Path
 from typing import List, Optional
 
 import click
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 from social_media_transcriber.config.settings import Settings
 from social_media_transcriber.core.downloader import Downloader
@@ -21,7 +21,6 @@ from social_media_transcriber.utils.file_utils import (
 )
 from social_media_transcriber.utils.processing import process_urls
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
@@ -37,7 +36,6 @@ def cli() -> None:
 
     A tool to download and transcribe videos from YouTube, TikTok, and more.
     """
-    # This function is the entry point for the CLI group.
     pass
 
 
@@ -51,8 +49,7 @@ def cli() -> None:
 @click.option(
     "-o", "--output-dir",
     type=click.Path(file_okay=False, path_type=Path),
-    default="output",
-    show_default=True,
+    default=None,  # Will be handled by settings
     help="Directory to save the transcripts."
 )
 @click.option(
@@ -65,8 +62,7 @@ def cli() -> None:
 @click.option(
     "--speed",
     type=float,
-    default=3.0,
-    show_default=True,
+    default=None,  # Will be handled by settings
     help="Audio speed multiplier for faster transcription (1.0=normal)."
 )
 @click.option(
@@ -75,19 +71,23 @@ def cli() -> None:
     default=False,
     help="Enable verbose output during transcription."
 )
+@click.option(
+    "--enhance",
+    is_flag=True,
+    default=False,
+    help="Enhance transcript with an LLM for formatting and grammar."
+)
 def run(
     urls: List[str],
     file_path: Optional[Path],
-    output_dir: Path,
+    output_dir: Optional[Path],
     max_workers: int,
-    speed: float,
-    verbose: bool
+    speed: Optional[float],
+    verbose: bool,
+    enhance: bool
 ) -> None:
     """
     Download and transcribe videos from URLs or a file.
-
-    You can provide one or more URLs directly as arguments or use the --file
-    option to specify a text file containing multiple URLs.
     """
     if not urls and not file_path:
         raise click.UsageError("You must provide at least one URL or use the --file option.")
@@ -100,29 +100,35 @@ def run(
         logger.warning("No URLs to process.")
         return
 
-    logger.info("Starting transcription for %d URL(s).", len(all_urls))
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     # Initialize components
     settings = Settings(output_dir=output_dir)
     downloader = Downloader()
     transcriber = AudioTranscriber(settings=settings)
-    transcriber.set_speed_multiplier(speed)
 
-    # Process URLs
+    # Override default speed if provided via CLI
+    if speed is not None:
+        transcriber.set_speed_multiplier(speed)
+
+    final_output_dir = settings.output_dir
+    logger.info("Starting transcription for %d URL(s). Output will be saved to %s", len(all_urls), final_output_dir.resolve())
+    final_output_dir.mkdir(parents=True, exist_ok=True)
+
     results = process_urls(
         urls=all_urls,
-        output_dir=output_dir,
+        output_dir=final_output_dir,
         transcriber=transcriber,
         downloader=downloader,
         max_workers=max_workers,
+        settings=settings,
+        enhance_transcript=enhance
     )
 
     logger.info("--- Processing Complete ---")
     logger.info("Successfully transcribed %d videos.", len(results))
-    if len(results) < len(all_urls):
-        logger.warning("Failed to transcribe %d videos.", len(all_urls) - len(results))
-    logger.info("Output saved to: %s", output_dir.resolve())
+    unsuccessful_count = len(all_urls) - len(results)
+    if unsuccessful_count > 0:
+        logger.warning("Failed to transcribe %d source URLs.", unsuccessful_count)
+    logger.info("Output saved to: %s", final_output_dir.resolve())
 
 
 @cli.command("combine")

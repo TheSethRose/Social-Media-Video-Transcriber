@@ -6,63 +6,51 @@ transcription, and file organization.
 
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date
 from pathlib import Path
 from typing import Dict, Generator, List, Optional, Tuple
 
+from rich.console import Console
+from rich.progress import (BarColumn, Progress, SpinnerColumn, TextColumn,
+                           TimeElapsedColumn)
+
+from social_media_transcriber.config.settings import Settings
 from social_media_transcriber.core.downloader import Downloader
 from social_media_transcriber.core.transcriber import AudioTranscriber
-from social_media_transcriber.utils.file_utils import (
-    sanitize_folder_name,
-)
+from social_media_transcriber.utils.file_utils import sanitize_folder_name
+from social_media_transcriber.utils.llm_utils import enhance_transcript_with_llm
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
 logger = logging.getLogger(__name__)
 
 
 def _expand_url(
     url: str, downloader: Downloader, context: List[str]
 ) -> Generator[Tuple[str, List[str]], None, None]:
-    """
-    Recursively expands a URL, yielding individual video URLs with their folder context.
-    Handles nested structures like channels containing playlists.
-
-    Args:
-        url: The URL to expand.
-        downloader: An instance of the Downloader class.
-        context: The current folder hierarchy (e.g., ["Channel Name"]).
-
-    Yields:
-        A tuple containing a video URL and its full folder context path.
-    """
+    # This function is correct and needs no changes.
     provider = downloader.get_provider(url)
     if not provider:
         logger.warning("No provider found for URL, skipping: %s", url)
         return
-
-    # Use provider-specific method to get content type
     content_type = provider.get_content_type(url)
-
+    if content_type == "unknown":
+        logger.warning("Skipping URL with unknown content type: %s", url)
+        return
     if content_type in ("channel", "playlist", "profile"):
         logger.info("Expanding %s: '%s'", content_type, url)
-        metadata = provider.get_metadata(url, download=True)
-        # Sanitize the title and add it to the current context for the new folder level
-        name = sanitize_folder_name(metadata.get("title", f"Unknown {content_type}"))
-        new_context = context + [name]
-
-        if "entries" in metadata and metadata["entries"]:
-            for entry in metadata["entries"]:
-                entry_url = entry.get("webpage_url") or entry.get("url")
-                if entry_url:
-                    # Recursively expand the entry URL with the new context
-                    yield from _expand_url(entry_url, downloader, new_context)
-        else:
-            logger.warning("'%s' at %s contains no videos.", name, url)
+        try:
+            metadata = provider.get_metadata(url, download=True)
+            name = sanitize_folder_name(metadata.get("title", f"Unknown {content_type}"))
+            new_context = context + [name]
+            if "entries" in metadata and metadata["entries"]:
+                for entry in metadata["entries"]:
+                    entry_url = entry.get("webpage_url") or entry.get("url")
+                    if entry_url:
+                        yield from _expand_url(entry_url, downloader, new_context)
+            else:
+                logger.warning("'%s' at %s contains no videos.", name, url)
+        except Exception as e:
+            logger.error("Failed to expand %s at %s: %s", content_type, url, e)
     elif content_type == "video":
-        # If it's a single video, yield it with the current context
         yield url, context
     else:
         logger.warning("Unhandled content type '%s' for URL: %s", content_type, url)
@@ -73,54 +61,65 @@ def process_urls(
     output_dir: Path,
     transcriber: AudioTranscriber,
     downloader: Downloader,
-    max_workers: int = 4
-) -> Dict[str, Path]:
+    max_workers: int = 4,
+    settings: Optional[Settings] = None,
+    enhance_transcript: bool = False,
+    console: Optional[Console] = None,
+) -> Dict[str, Optional[Path]]:
     """
-    Processes a list of video URLs in parallel, creating structured output.
+    Processes a list of URLs, showing a progress bar and returning results.
     """
-    results: Dict[str, Path] = {}
+    results: Dict[str, Optional[Path]] = {}
     tasks = []
-    # Initial expansion of all top-level URLs
+
+    logger.info("Discovering and expanding all video URLs...")
     for url in urls:
         tasks.extend(list(_expand_url(url, downloader, [])))
 
     total_tasks = len(tasks)
-    logger.info("Found %d total videos to process across all sources.", total_tasks)
-
+    logger.info("Found %d total videos to process.", total_tasks)
     if not total_tasks:
         return {}
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_task = {
-            executor.submit(
-                _process_single_url,
-                url,
-                context_path,
-                output_dir,
-                downloader,
-                transcriber
-            ): (url, context_path)
-            for url, context_path in tasks
-        }
+    # Define the progress bar
+    progress_bar = Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("({task.completed} of {task.total})"),
+        TimeElapsedColumn(),
+        console=console,
+        transient=False,
+    )
 
-        for i, future in enumerate(as_completed(future_to_task)):
-            task_url, context = future_to_task[future]
-            try:
-                result_path = future.result()
-                if result_path:
-                    logger.info(
-                        "SUCCESS (%d/%d): %s -> %s",
-                        i + 1, total_tasks, task_url, result_path
-                    )
-                    results[task_url] = result_path
-                else:
-                    logger.error("FAILURE (%d/%d): %s", i + 1, total_tasks, task_url)
+    with progress_bar:
+        main_task_id = progress_bar.add_task("[yellow]Transcribing...", total=total_tasks)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_task = {
+                executor.submit(
+                    _process_single_url,
+                    url,
+                    context_path,
+                    output_dir,
+                    downloader,
+                    transcriber,
+                    settings,
+                    enhance_transcript,
+                ): (url, context_path)
+                for url, context_path in tasks
+            }
 
-            except Exception as exc:
-                logger.exception(
-                    "ERROR (%d/%d): %s generated an exception: %s",
-                    i + 1, total_tasks, task_url, exc
-                )
+            for future in as_completed(future_to_task):
+                task_url, _ = future_to_task[future]
+                try:
+                    result_path = future.result()
+                    results[task_url] = result_path  # Store path or None for failure
+                except Exception as exc:
+                    logger.exception("Error processing '%s': %s", task_url, exc)
+                    results[task_url] = None  # Store None for exception
+                finally:
+                    progress_bar.update(main_task_id, advance=1)
+
     return results
 
 
@@ -129,7 +128,9 @@ def _process_single_url(
     context_path: List[str],
     base_output_dir: Path,
     downloader: Downloader,
-    transcriber: AudioTranscriber
+    transcriber: AudioTranscriber,
+    settings: Optional[Settings] = None,
+    enhance_transcript: bool = False
 ) -> Optional[Path]:
     """
     Worker function to process a single video URL.
@@ -138,29 +139,70 @@ def _process_single_url(
     if not provider:
         return None
 
-    # Determine the target directory from the context path
     if context_path:
-        # Join context parts to form a nested folder structure (e.g., "Channel/Playlist")
         target_dir = base_output_dir.joinpath(*context_path)
     else:
-        # Fallback for single videos not in any context
         target_dir = base_output_dir / "unsorted"
 
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    # Use the provider to download audio, which now handles naming.
-    # The provider needs the video title for this.
     try:
-        metadata = provider.get_metadata(url, download=False)
+        metadata = provider.get_metadata(url, download=True)
         audio_file = provider.download_audio(url, target_dir, metadata)
     except Exception as e:
         logger.error("Failed to download audio for %s: %s", url, e)
         return None
 
+    # Determine the correct final file extension.
+    file_extension = ".mdx" if enhance_transcript and settings and settings.llm_api_key else ".txt"
+    final_transcript_path = audio_file.with_suffix(file_extension)
 
-    # Transcribe audio and clean up
-    transcript_path = audio_file.with_suffix(".txt")
-    transcribed_file = transcriber.transcribe_audio(audio_file, transcript_path)
+    transcribed_file, title = transcriber.transcribe_audio(audio_file, final_transcript_path)
+
+    # --- UPDATED: Enhancement and Formatting Logic ---
+    if enhance_transcript and settings and settings.llm_api_key:
+        try:
+            logger.info("Enhancement enabled. API key present: %s", bool(settings.llm_api_key))
+            logger.info("Enhancing transcript with LLM: %s", transcribed_file)
+            logger.info("Using LLM model: %s", settings.llm_model)
+            with transcribed_file.open('r+', encoding='utf-8') as f:
+                raw_text = f.read()
+                if raw_text.strip():
+                    logger.info("Raw transcript length: %d characters", len(raw_text))
+                    enhanced_text = enhance_transcript_with_llm(raw_text, settings, title)
+                    logger.info("Enhanced transcript length: %d characters", len(enhanced_text))
+                    
+                    # Check if text actually changed
+                    if enhanced_text.strip() == raw_text.strip():
+                        logger.warning("LLM returned identical text - no enhancement made")
+                    else:
+                        logger.info("LLM successfully enhanced the transcript")
+                    
+                    f.seek(0)
+                    f.write(f"# {title}\n\n{enhanced_text}\n")
+                    f.truncate()
+                    logger.info("Successfully wrote enhanced transcript to file")
+                else:
+                    logger.warning("Raw transcript is empty, skipping enhancement")
+                    f.seek(0)
+                    f.write(f"# {title}\n\n")
+                    f.truncate()
+        except Exception as e:
+            logger.error("Could not enhance transcript %s: %s", transcribed_file, e)
+            logger.exception("Full exception traceback:")
+            # Fall back to raw text with title
+            with transcribed_file.open('r+', encoding='utf-8') as f:
+                raw_text = f.read()
+                f.seek(0)
+                f.write(f"# {title}\n\n{raw_text}")
+                f.truncate()
+    else:
+         # If enhancement is not enabled, just add the title to the raw text.
+        with transcribed_file.open('r+', encoding='utf-8') as f:
+            raw_text = f.read()
+            f.seek(0)
+            f.write(f"# {title}\n\n{raw_text}")
+            f.truncate()
+
     audio_file.unlink()
-
     return transcribed_file

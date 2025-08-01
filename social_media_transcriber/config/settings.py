@@ -1,56 +1,58 @@
 # social_media_transcriber/config/settings.py
 """
 Configuration settings for the Social Media Transcriber package.
-"""
 
+This module loads default values from environment variables, allowing for
+flexible configuration without code changes.
+"""
+import os
 from pathlib import Path
 from typing import Optional
 
-# Default output directories
-DEFAULT_OUTPUT_DIR = Path("output")
-DEFAULT_TRANSCRIPTS_DIR = DEFAULT_OUTPUT_DIR / "transcripts"
-
-# Default bulk processing file
-DEFAULT_BULK_FILE = "bulk.txt"
-
-# Audio processing settings
-AUDIO_SAMPLE_RATE = 16000  # 16kHz required by Parakeet-MLX
-AUDIO_CHANNELS = 1  # Mono
-AUDIO_SPEED_MULTIPLIER = 3.0  # Default audio speed-up (3x)
-
-# File naming patterns
-TRANSCRIPT_TITLE_TEMPLATE = "{title}_transcript.txt"
-BULK_SESSION_TEMPLATE = "bulk_transcripts_{timestamp}"
-
+# These can remain as constants or fallbacks
+FALLBACK_LLM_MODEL = "google/gemini-flash-1.5"
+FALLBACK_OUTPUT_DIR = "output"
+FALLBACK_AUDIO_SPEED = 3.0
 
 class Settings:
-    """Configuration settings container."""
+    """
+    Configuration settings container.
+
+    Initializes by loading values from environment variables at runtime,
+    ensuring .env file has been processed.
+    """
 
     def __init__(
         self,
         output_dir: Optional[Path] = None,
-        transcripts_dir: Optional[Path] = None,
         bulk_file: Optional[str] = None
     ):
         """
-        Initialize settings with optional overrides.
-
-        Args:
-            output_dir: The main directory for all output.
-            transcripts_dir: The subdirectory for transcript files.
-            bulk_file: The default filename for a list of URLs.
+        Initialize settings, loading from environment or using fallbacks.
         """
-        self.output_dir = Path(output_dir) if output_dir else DEFAULT_OUTPUT_DIR
-        self.transcripts_dir = (
-            Path(transcripts_dir) if transcripts_dir else DEFAULT_TRANSCRIPTS_DIR
-        )
-        self.bulk_file = bulk_file or DEFAULT_BULK_FILE
+        # --- LLM settings are now loaded here ---
+        self.llm_api_key = os.getenv("OPENROUTER_API_KEY")
+        self.llm_api_url = "https://openrouter.ai/api/v1/chat/completions"
+        self.llm_model = os.getenv("DEFAULT_LLM_MODEL", FALLBACK_LLM_MODEL)
 
-        # Audio settings
-        self.audio_sample_rate = AUDIO_SAMPLE_RATE
-        self.audio_channels = AUDIO_CHANNELS
-        self.audio_speed_multiplier = AUDIO_SPEED_MULTIPLIER
+        # --- Other settings are also loaded here ---
+        default_speed_str = os.getenv("DEFAULT_AUDIO_SPEED", str(FALLBACK_AUDIO_SPEED))
+        try:
+            self.audio_speed_multiplier = float(default_speed_str)
+        except (ValueError, TypeError):
+            self.audio_speed_multiplier = FALLBACK_AUDIO_SPEED
+
+        # CLI options take precedence over environment variables for output_dir
+        if output_dir:
+            self.output_dir = output_dir
+        else:
+            self.output_dir = Path(os.getenv("DEFAULT_OUTPUT_DIR", FALLBACK_OUTPUT_DIR))
+
+        # Non-environment settings
+        self.bulk_file = bulk_file or "bulk.txt"
+        self.audio_sample_rate = 16000  # Required by Parakeet-MLX
+        self.audio_channels = 1         # Mono
 
         # Templates
-        self.transcript_title_template = TRANSCRIPT_TITLE_TEMPLATE
-        self.bulk_session_template = BULK_SESSION_TEMPLATE
+        self.transcript_title_template = "{title}_transcript.txt"
+        self.bulk_session_template = "bulk_transcripts_{timestamp}"

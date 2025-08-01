@@ -1,4 +1,3 @@
-# social_media_transcriber/__init__.py
 """
 Social Media Video Transcriber
 
@@ -7,7 +6,6 @@ Instagram, and transcribing their audio using Parakeet-MLX.
 """
 
 __version__ = "2.0.0"
-__author__ = "Your Name"
 
 from .core.downloader import Downloader
 from .core.transcriber import AudioTranscriber

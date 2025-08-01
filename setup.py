@@ -4,7 +4,6 @@ Setup script for the Social Media Transcriber package.
 """
 
 from pathlib import Path
-
 from setuptools import find_packages, setup
 
 # Read the README file for the long description
@@ -42,6 +41,7 @@ setup(
         "parakeet-mlx>=0.1.0",
         "click>=8.0.0",
         "mlx",
+        "python-dotenv>=0.21.0"
     ],
     entry_points={
         "console_scripts": [
