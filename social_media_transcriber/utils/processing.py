@@ -231,12 +231,18 @@ def _process_single_url(
         with transcribed_file.open('w', encoding='utf-8') as f:
             f.write(raw_text)
 
-    # Clean up audio file if it exists (transcript files don't need cleanup)
-    # Also clean up the original .txt file if we created a .mdx file from it
-    if not is_transcript_file and downloaded_file.exists():
-        downloaded_file.unlink()
-    elif is_transcript_file and enhance_transcript and settings and settings.llm_api_key and downloaded_file.exists() and downloaded_file.suffix == '.txt':
-        # Remove the original .txt file since we created a .mdx file
-        downloaded_file.unlink()
+    # Clean up files appropriately
+    if is_transcript_file:
+        # For transcript files, clean up the original .txt if we created a .mdx
+        if enhance_transcript and settings and settings.llm_api_key:
+            original_txt_file = downloaded_file
+            if original_txt_file.exists() and original_txt_file.suffix == '.txt' and original_txt_file != transcribed_file:
+                original_txt_file.unlink()
+                logger.info("Cleaned up original transcript file: %s", original_txt_file)
+    else:
+        # For audio files, clean up the downloaded audio file
+        if downloaded_file.exists():
+            downloaded_file.unlink()
+            logger.info("Cleaned up audio file: %s", downloaded_file)
     
     return transcribed_file
