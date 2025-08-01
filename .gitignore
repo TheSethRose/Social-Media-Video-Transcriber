@@ -1,11 +1,9 @@
-# Python
+# Environment Variables
 .env
+
+# Python
 .pytest_cache/
 social_media_transcriber.egg-info/
-.gitignore
-.git/
-.venv/
-venv/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -36,14 +34,32 @@ ENV/
 .venv/
 .env/
 
-# Output directories
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Output directories and files
 output/
 transcripts/
 threads/
 downloads/
+processing/
+temp/
+tmp/
+*.tmp
+
+# Media files
 *.mp4
 *.mp3
 *.wav
+*.webm
+*.mkv
+*.mp4.part
+*.webm.part
+
+# Text files (except specific ones)
 *.txt
 !requirements.txt
 !README.txt
@@ -51,14 +67,14 @@ downloads/
 !docs/*.txt
 !docs/*.md
 
-# IDE
+# IDE and Editor
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
+# Operating System
 .DS_Store
 .DS_Store?
 ._*
@@ -71,20 +87,14 @@ Thumbs.db
 *.log
 logs/
 
-# Temporary files
-temp/
-tmp/
-*.tmp
-
 # Jupyter Notebooks (analysis files)
 *.ipynb
 !docs/*.ipynb
 
-# Temporary scripts
+# Temporary scripts and generated files
 combine_transcripts.py
 bulk_channels.txt
 test_*.py
 analyze_*.py
-
 generate.py
 output.md

@@ -101,26 +101,38 @@ class BaseYtDlpProvider(VideoProvider):
     def download_audio(self, url: str, output_path: Path, metadata: Dict[str, Any]) -> Path:
         """Downloads audio using yt-dlp and names it based on video title."""
         video_title = metadata.get("title", "Unknown Video")
-        sanitized_title = sanitize_folder_name(video_title)  # Re-use sanitizer for file names
+        sanitized_title = sanitize_folder_name(video_title)
         
-        # Define a clean output filename using the title.
-        output_template = str(output_path / f"{sanitized_title}.%(ext)s")
+        # Ensure output directory exists
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        # Use simple filename template - yt-dlp will handle path resolution
+        output_template = f"{sanitized_title}.%(ext)s"
         
         opts = self._ydl_download_opts.copy()
         opts['outtmpl'] = output_template
+        
+        # Set paths according to yt-dlp best practices
+        opts['paths'] = {
+            'home': str(output_path),
+        }
 
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
-                # The final path will be the sanitized title with a .wav extension
+                
+                # Find the downloaded file - yt-dlp places it in the home path
                 expected_file = output_path / f"{sanitized_title}.wav"
-                if not expected_file.exists():
-                    # Fallback for rare cases where title is not available/usable
-                    files = list(output_path.glob("*.wav"))
-                    if not files:
-                        raise RuntimeError("Audio file was not created after download.")
-                    return files[0]
-                return expected_file
+                if expected_file.exists():
+                    return expected_file
+                
+                # Fallback: search for any .wav file in output directory
+                wav_files = list(output_path.glob("*.wav"))
+                if wav_files:
+                    return wav_files[0]
+                    
+                raise RuntimeError("Audio file was not created after download.")
+                
         except yt_dlp.utils.DownloadError as e:
             logger.error("yt-dlp failed to download audio for %s: %s", url, e)
             raise RuntimeError(f"Audio download failed for {url}") from e

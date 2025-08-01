@@ -139,16 +139,22 @@ def _process_single_url(
     if not provider:
         return None
 
+    # Create processing directory for intermediate files
+    processing_dir = base_output_dir.parent / "processing"
     if context_path:
-        target_dir = base_output_dir.joinpath(*context_path)
+        processing_target_dir = processing_dir.joinpath(*context_path)
+        final_output_dir = base_output_dir.joinpath(*context_path)
     else:
-        target_dir = base_output_dir / "unsorted"
+        processing_target_dir = processing_dir / "unsorted"
+        final_output_dir = base_output_dir / "unsorted"
 
-    target_dir.mkdir(parents=True, exist_ok=True)
+    processing_target_dir.mkdir(parents=True, exist_ok=True)
+    final_output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
         metadata = provider.get_metadata(url, download=True)
-        downloaded_file = provider.download_audio(url, target_dir, metadata)
+        # Download to processing directory
+        downloaded_file = provider.download_audio(url, processing_target_dir, metadata)
     except Exception as e:
         logger.error("Failed to download audio/transcript for %s: %s", url, e)
         return None
@@ -156,6 +162,7 @@ def _process_single_url(
     # Check if we got a transcript file (from YouTube transcript extraction)
     # or an audio file (needs transcription)
     is_transcript_file = downloaded_file.suffix == '.txt' and 'transcript' in downloaded_file.name
+    intermediate_transcript_file = None  # Initialize for cleanup
     
     if is_transcript_file:
         # We already have a transcript file, no need for audio transcription
@@ -166,30 +173,34 @@ def _process_single_url(
         with downloaded_file.open('r', encoding='utf-8') as f:
             raw_text = f.read()
         
-        # Determine the correct final file extension and path for enhancement
+        # Determine the final output file path
         if enhance_transcript and settings and settings.llm_api_key:
-            transcribed_file = downloaded_file.with_suffix('.mdx')
+            final_file = final_output_dir / f"{downloaded_file.stem.replace('_transcript', '')}.mdx"
         else:
-            transcribed_file = downloaded_file
+            final_file = final_output_dir / f"{downloaded_file.stem.replace('_transcript', '')}.txt"
     else:
         # We have an audio file, need to transcribe it
         logger.info("Transcribing audio file: %s", downloaded_file)
         
-        # Determine the correct final file extension.
-        file_extension = ".mdx" if enhance_transcript and settings and settings.llm_api_key else ".txt"
-        final_transcript_path = downloaded_file.with_suffix(file_extension)
-
-        transcribed_file, title = transcriber.transcribe_audio(downloaded_file, final_transcript_path)
+        # Create intermediate transcript file in processing directory
+        processing_transcript_path = downloaded_file.with_suffix('.txt')
+        intermediate_transcript_file, title = transcriber.transcribe_audio(downloaded_file, processing_transcript_path)
         
         # Read the transcribed content
-        with transcribed_file.open('r', encoding='utf-8') as f:
+        with intermediate_transcript_file.open('r', encoding='utf-8') as f:
             raw_text = f.read()
+            
+        # Determine the final output file path
+        if enhance_transcript and settings and settings.llm_api_key:
+            final_file = final_output_dir / f"{downloaded_file.stem}.mdx"
+        else:
+            final_file = final_output_dir / f"{downloaded_file.stem}.txt"
 
     # --- UPDATED: Enhancement and Formatting Logic ---
     if enhance_transcript and settings and settings.llm_api_key:
         try:
             logger.info("Enhancement enabled. API key present: %s", bool(settings.llm_api_key))
-            logger.info("Enhancing transcript with LLM: %s", transcribed_file)
+            logger.info("Enhancing transcript with LLM: %s", final_file)
             logger.info("Using LLM model: %s", settings.llm_model)
             
             if raw_text.strip():
@@ -204,7 +215,7 @@ def _process_single_url(
                     logger.info("LLM successfully enhanced the transcript")
                 
                 # Apply Prettier formatting to the enhanced MDX content
-                if transcribed_file.suffix.lower() == '.mdx':
+                if final_file.suffix.lower() == '.mdx':
                     logger.info("Applying Prettier formatting to MDX file")
                     formatted_text = format_mdx_with_prettier(enhanced_text)
                     if formatted_text != enhanced_text:
@@ -213,36 +224,38 @@ def _process_single_url(
                     else:
                         logger.info("No formatting changes needed by Prettier")
                 
-                with transcribed_file.open('w', encoding='utf-8') as f:
+                with final_file.open('w', encoding='utf-8') as f:
                     f.write(enhanced_text)
                     logger.info("Successfully wrote enhanced transcript to file")
             else:
                 logger.warning("Raw transcript is empty, skipping enhancement")
-                with transcribed_file.open('w', encoding='utf-8') as f:
+                with final_file.open('w', encoding='utf-8') as f:
                     f.write("")  # Write empty file
         except Exception as e:
-            logger.error("Could not enhance transcript %s: %s", transcribed_file, e)
+            logger.error("Could not enhance transcript %s: %s", final_file, e)
             logger.exception("Full exception traceback:")
             # Fall back to raw text with title
-            with transcribed_file.open('w', encoding='utf-8') as f:
+            with final_file.open('w', encoding='utf-8') as f:
                 f.write(raw_text)
     else:
          # If enhancement is not enabled, just ensure the raw text is in the file
-        with transcribed_file.open('w', encoding='utf-8') as f:
+        with final_file.open('w', encoding='utf-8') as f:
             f.write(raw_text)
 
-    # Clean up files appropriately
+    # Clean up files appropriately - everything stays in processing directory
     if is_transcript_file:
-        # For transcript files, clean up the original .txt if we created a .mdx
-        if enhance_transcript and settings and settings.llm_api_key:
-            original_txt_file = downloaded_file
-            if original_txt_file.exists() and original_txt_file.suffix == '.txt' and original_txt_file != transcribed_file:
-                original_txt_file.unlink()
-                logger.info("Cleaned up original transcript file: %s", original_txt_file)
+        # For transcript files, clean up the original .txt processing file
+        if downloaded_file.exists():
+            downloaded_file.unlink()
+            logger.info("Cleaned up processing transcript file: %s", downloaded_file)
     else:
-        # For audio files, clean up the downloaded audio file
+        # For audio files, clean up the downloaded audio file and intermediate transcript
         if downloaded_file.exists():
             downloaded_file.unlink()
             logger.info("Cleaned up audio file: %s", downloaded_file)
+        # Also clean up the intermediate transcript file if it exists
+        if intermediate_transcript_file and intermediate_transcript_file.exists():
+            intermediate_transcript_file.unlink()
+            logger.info("Cleaned up intermediate transcript file: %s", intermediate_transcript_file)
     
-    return transcribed_file
+    return final_file
