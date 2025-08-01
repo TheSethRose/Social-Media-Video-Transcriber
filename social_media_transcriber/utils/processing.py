@@ -18,7 +18,7 @@ from social_media_transcriber.config.settings import Settings
 from social_media_transcriber.core.downloader import Downloader
 from social_media_transcriber.core.transcriber import AudioTranscriber
 from social_media_transcriber.utils.file_utils import sanitize_folder_name
-from social_media_transcriber.utils.llm_utils import enhance_transcript_with_llm
+from social_media_transcriber.utils.llm_utils import enhance_transcript_with_llm, format_mdx_with_prettier
 
 logger = logging.getLogger(__name__)
 
@@ -148,16 +148,42 @@ def _process_single_url(
 
     try:
         metadata = provider.get_metadata(url, download=True)
-        audio_file = provider.download_audio(url, target_dir, metadata)
+        downloaded_file = provider.download_audio(url, target_dir, metadata)
     except Exception as e:
-        logger.error("Failed to download audio for %s: %s", url, e)
+        logger.error("Failed to download audio/transcript for %s: %s", url, e)
         return None
 
-    # Determine the correct final file extension.
-    file_extension = ".mdx" if enhance_transcript and settings and settings.llm_api_key else ".txt"
-    final_transcript_path = audio_file.with_suffix(file_extension)
+    # Check if we got a transcript file (from YouTube transcript extraction)
+    # or an audio file (needs transcription)
+    is_transcript_file = downloaded_file.suffix == '.txt' and 'transcript' in downloaded_file.name
+    
+    if is_transcript_file:
+        # We already have a transcript file, no need for audio transcription
+        logger.info("Using extracted transcript file: %s", downloaded_file)
+        title = metadata.get('title', 'Unknown Video')
+        
+        # Read the transcript content
+        with downloaded_file.open('r', encoding='utf-8') as f:
+            raw_text = f.read()
+        
+        # Determine the correct final file extension and path for enhancement
+        if enhance_transcript and settings and settings.llm_api_key:
+            transcribed_file = downloaded_file.with_suffix('.mdx')
+        else:
+            transcribed_file = downloaded_file
+    else:
+        # We have an audio file, need to transcribe it
+        logger.info("Transcribing audio file: %s", downloaded_file)
+        
+        # Determine the correct final file extension.
+        file_extension = ".mdx" if enhance_transcript and settings and settings.llm_api_key else ".txt"
+        final_transcript_path = downloaded_file.with_suffix(file_extension)
 
-    transcribed_file, title = transcriber.transcribe_audio(audio_file, final_transcript_path)
+        transcribed_file, title = transcriber.transcribe_audio(downloaded_file, final_transcript_path)
+        
+        # Read the transcribed content
+        with transcribed_file.open('r', encoding='utf-8') as f:
+            raw_text = f.read()
 
     # --- UPDATED: Enhancement and Formatting Logic ---
     if enhance_transcript and settings and settings.llm_api_key:
@@ -165,44 +191,52 @@ def _process_single_url(
             logger.info("Enhancement enabled. API key present: %s", bool(settings.llm_api_key))
             logger.info("Enhancing transcript with LLM: %s", transcribed_file)
             logger.info("Using LLM model: %s", settings.llm_model)
-            with transcribed_file.open('r+', encoding='utf-8') as f:
-                raw_text = f.read()
-                if raw_text.strip():
-                    logger.info("Raw transcript length: %d characters", len(raw_text))
-                    enhanced_text = enhance_transcript_with_llm(raw_text, settings, title)
-                    logger.info("Enhanced transcript length: %d characters", len(enhanced_text))
-                    
-                    # Check if text actually changed
-                    if enhanced_text.strip() == raw_text.strip():
-                        logger.warning("LLM returned identical text - no enhancement made")
-                    else:
-                        logger.info("LLM successfully enhanced the transcript")
-                    
-                    f.seek(0)
-                    f.write(f"# {title}\n\n{enhanced_text}\n")
-                    f.truncate()
-                    logger.info("Successfully wrote enhanced transcript to file")
+            
+            if raw_text.strip():
+                logger.info("Raw transcript length: %d characters", len(raw_text))
+                enhanced_text = enhance_transcript_with_llm(raw_text, settings, title)
+                logger.info("Enhanced transcript length: %d characters", len(enhanced_text))
+                
+                # Check if text actually changed
+                if enhanced_text.strip() == raw_text.strip():
+                    logger.warning("LLM returned identical text - no enhancement made")
                 else:
-                    logger.warning("Raw transcript is empty, skipping enhancement")
-                    f.seek(0)
-                    f.write(f"# {title}\n\n")
-                    f.truncate()
+                    logger.info("LLM successfully enhanced the transcript")
+                
+                # Apply Prettier formatting to the enhanced MDX content
+                if transcribed_file.suffix.lower() == '.mdx':
+                    logger.info("Applying Prettier formatting to MDX file")
+                    formatted_text = format_mdx_with_prettier(enhanced_text)
+                    if formatted_text != enhanced_text:
+                        logger.info("Prettier successfully formatted the MDX content")
+                        enhanced_text = formatted_text
+                    else:
+                        logger.info("No formatting changes needed by Prettier")
+                
+                with transcribed_file.open('w', encoding='utf-8') as f:
+                    f.write(enhanced_text)
+                    logger.info("Successfully wrote enhanced transcript to file")
+            else:
+                logger.warning("Raw transcript is empty, skipping enhancement")
+                with transcribed_file.open('w', encoding='utf-8') as f:
+                    f.write("")  # Write empty file
         except Exception as e:
             logger.error("Could not enhance transcript %s: %s", transcribed_file, e)
             logger.exception("Full exception traceback:")
             # Fall back to raw text with title
-            with transcribed_file.open('r+', encoding='utf-8') as f:
-                raw_text = f.read()
-                f.seek(0)
-                f.write(f"# {title}\n\n{raw_text}")
-                f.truncate()
+            with transcribed_file.open('w', encoding='utf-8') as f:
+                f.write(raw_text)
     else:
-         # If enhancement is not enabled, just add the title to the raw text.
-        with transcribed_file.open('r+', encoding='utf-8') as f:
-            raw_text = f.read()
-            f.seek(0)
-            f.write(f"# {title}\n\n{raw_text}")
-            f.truncate()
+         # If enhancement is not enabled, just ensure the raw text is in the file
+        with transcribed_file.open('w', encoding='utf-8') as f:
+            f.write(raw_text)
 
-    audio_file.unlink()
+    # Clean up audio file if it exists (transcript files don't need cleanup)
+    # Also clean up the original .txt file if we created a .mdx file from it
+    if not is_transcript_file and downloaded_file.exists():
+        downloaded_file.unlink()
+    elif is_transcript_file and enhance_transcript and settings and settings.llm_api_key and downloaded_file.exists() and downloaded_file.suffix == '.txt':
+        # Remove the original .txt file since we created a .mdx file
+        downloaded_file.unlink()
+    
     return transcribed_file
