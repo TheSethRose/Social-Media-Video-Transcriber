@@ -62,7 +62,7 @@ class AudioTranscriber:
                 speed_multiplier=self.settings.audio_speed_multiplier,
             )
             logger.info(
-                "Audio processed at %.1fx speed for faster transcription.",
+                "✅ Audio processed at %.1fx speed for faster transcription.",
                 self.settings.audio_speed_multiplier
             )
 
@@ -76,8 +76,9 @@ class AudioTranscriber:
             if verbose:
                 cmd.append("--verbose")
 
-            logger.info("Starting transcription for %s...", audio_file.name)
+            logger.info("🔄 Starting parakeet-mlx transcription: %s", audio_file.name)
             subprocess.run(cmd, check=True, capture_output=not verbose, text=True)
+            logger.info("✅ Parakeet-mlx transcription completed")
 
             if not temp_txt_output.exists():
                 raise FileNotFoundError(f"Transcription failed: temporary file {temp_txt_output} not created.")

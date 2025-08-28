@@ -25,10 +25,12 @@ class YouTubeProvider(BaseYtDlpProvider):
 
     def get_content_type(self, url: str) -> str:
         """Determines if a YouTube URL is a video, playlist, or channel."""
+        # Check for playlist first (can contain video parameters)
+        if re.search(r"[?&]list=", url):
+            return "playlist"
+        # Then check for video
         if re.search(r"/watch\?v=", url) or re.search(r"youtu\.be/", url):
             return "video"
-        if re.search(r"/playlist\?list=", url):
-            return "playlist"
         # Match channel URLs like /@channelname, /channel/UC..., /c/channelname
         if re.search(r"/(?:@|channel/|c/)", url):
             return "channel"
@@ -63,14 +65,13 @@ class YouTubeProvider(BaseYtDlpProvider):
 
             logger.info("Attempting to extract transcript for video ID: %s", video_id)
             
-            # Try to get transcript using yt-dlp's built-in transcript capability
-            ydl_opts = {
-                'quiet': True,
-                'no_warnings': True,
+            # Use the same cookie configuration as the base provider
+            ydl_opts = self._ydl_extract_opts.copy()
+            ydl_opts.update({
                 'writesubtitles': False,
                 'writeautomaticsub': True,
                 'skip_download': True,
-            }
+            })
             
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 try:

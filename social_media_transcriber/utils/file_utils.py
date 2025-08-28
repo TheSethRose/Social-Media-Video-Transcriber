@@ -7,8 +7,11 @@ import datetime
 import subprocess
 import tempfile
 import glob
+import logging
 from pathlib import Path
 from typing import List, Optional, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 def extract_video_id(url: str) -> str:
     """
@@ -455,15 +458,8 @@ def process_audio_for_transcription(
     
     # Speed adjustment filter
     if speed_multiplier != 1.0:
-        if preserve_pitch and speed_multiplier > 2.0:
-            # Chain multiple atempo filters for speeds > 2x
-            remaining_speed = speed_multiplier
-            while remaining_speed > 2.0:
-                filters.append('atempo=2.0')
-                remaining_speed /= 2.0
-            if remaining_speed != 1.0:
-                filters.append(f'atempo={remaining_speed:.3f}')
-        elif preserve_pitch:
+        if preserve_pitch:
+            # Use a single atempo filter with the desired speed
             filters.append(f'atempo={speed_multiplier:.3f}')
         else:
             filters.append(f'tempo={speed_multiplier:.3f}')
@@ -481,7 +477,12 @@ def process_audio_for_transcription(
     ])
     
     try:
+        logger.info("🔄 Starting ffmpeg audio processing: speed=%.1fx, input=%s", speed_multiplier, input_path)
+        logger.info("📝 ffmpeg command: %s", ' '.join(cmd))
+        
         subprocess.run(cmd, capture_output=True, text=True, check=True)
+        
+        logger.info("✅ ffmpeg processing completed successfully")
         
         if not output_path.exists():
             raise FileNotFoundError(f"Audio processing failed: {output_path} not created")
@@ -494,6 +495,8 @@ def process_audio_for_transcription(
             output_path.unlink()
         
         error_msg = f"ffmpeg failed to process audio: {e.stderr if e.stderr else str(e)}"
+        logger.error("❌ ffmpeg error: %s", error_msg)
+        logger.error("❌ ffmpeg command was: %s", ' '.join(cmd))
         raise subprocess.CalledProcessError(e.returncode, cmd, error_msg)
 
 def combine_transcripts_in_channel_folder(channel_folder: Path, output_file: Path) -> None:

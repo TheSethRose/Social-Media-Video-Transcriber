@@ -93,7 +93,7 @@ def process_urls(
     )
 
     with progress_bar:
-        main_task_id = progress_bar.add_task("[yellow]Transcribing...", total=total_tasks)
+        main_task_id = progress_bar.add_task("[yellow]Initializing...", total=total_tasks)
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_task = {
                 executor.submit(
@@ -110,13 +110,25 @@ def process_urls(
             }
 
             for future in as_completed(future_to_task):
-                task_url, _ = future_to_task[future]
+                task_url, context_path = future_to_task[future]
                 try:
+                    # Update progress with current video info
+                    video_title = "Processing video..."
+                    progress_bar.update(main_task_id, description=f"[yellow]Processing: {video_title}")
+                    
                     result_path = future.result()
                     results[task_url] = result_path  # Store path or None for failure
+                    
+                    if result_path:
+                        video_title = result_path.stem.replace('_', ' ')
+                        progress_bar.update(main_task_id, description=f"[green]✓ Completed: {video_title}")
+                    else:
+                        progress_bar.update(main_task_id, description=f"[red]✗ Failed: {task_url}")
+                        
                 except Exception as exc:
                     logger.exception("Error processing '%s': %s", task_url, exc)
                     results[task_url] = None  # Store None for exception
+                    progress_bar.update(main_task_id, description=f"[red]✗ Error: {task_url}")
                 finally:
                     progress_bar.update(main_task_id, advance=1)
 
@@ -152,9 +164,11 @@ def _process_single_url(
     final_output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
+        logger.info("Starting download for: %s", url)
         metadata = provider.get_metadata(url, download=True)
         # Download to processing directory
         downloaded_file = provider.download_audio(url, processing_target_dir, metadata)
+        logger.info("Download completed: %s", downloaded_file)
     except Exception as e:
         logger.error("Failed to download audio/transcript for %s: %s", url, e)
         return None
@@ -180,11 +194,12 @@ def _process_single_url(
             final_file = final_output_dir / f"{downloaded_file.stem.replace('_transcript', '')}.txt"
     else:
         # We have an audio file, need to transcribe it
-        logger.info("Transcribing audio file: %s", downloaded_file)
+        logger.info("Starting transcription for audio file: %s", downloaded_file)
         
         # Create intermediate transcript file in processing directory
         processing_transcript_path = downloaded_file.with_suffix('.txt')
         intermediate_transcript_file, title = transcriber.transcribe_audio(downloaded_file, processing_transcript_path)
+        logger.info("Transcription completed: %s", intermediate_transcript_file)
         
         # Read the transcribed content
         with intermediate_transcript_file.open('r', encoding='utf-8') as f:
@@ -199,46 +214,46 @@ def _process_single_url(
     # --- UPDATED: Enhancement and Formatting Logic ---
     if enhance_transcript and settings and settings.llm_api_key:
         try:
-            logger.info("Enhancement enabled. API key present: %s", bool(settings.llm_api_key))
-            logger.info("Enhancing transcript with LLM: %s", final_file)
+            logger.info("🔄 Starting LLM enhancement for: %s", final_file.name)
             logger.info("Using LLM model: %s", settings.llm_model)
             
             if raw_text.strip():
                 logger.info("Raw transcript length: %d characters", len(raw_text))
                 enhanced_text = enhance_transcript_with_llm(raw_text, settings, title)
-                logger.info("Enhanced transcript length: %d characters", len(enhanced_text))
+                logger.info("✅ Enhancement completed. Enhanced transcript length: %d characters", len(enhanced_text))
                 
                 # Check if text actually changed
                 if enhanced_text.strip() == raw_text.strip():
-                    logger.warning("LLM returned identical text - no enhancement made")
+                    logger.warning("⚠️  LLM returned identical text - no enhancement made")
                 else:
-                    logger.info("LLM successfully enhanced the transcript")
+                    logger.info("✅ LLM successfully enhanced the transcript")
                 
                 # Apply Prettier formatting to the enhanced MDX content
                 if final_file.suffix.lower() == '.mdx':
-                    logger.info("Applying Prettier formatting to MDX file")
+                    logger.info("🔄 Applying Prettier formatting to MDX file")
                     formatted_text = format_mdx_with_prettier(enhanced_text)
                     if formatted_text != enhanced_text:
-                        logger.info("Prettier successfully formatted the MDX content")
+                        logger.info("✅ Prettier successfully formatted the MDX content")
                         enhanced_text = formatted_text
                     else:
-                        logger.info("No formatting changes needed by Prettier")
+                        logger.info("ℹ️  No formatting changes needed by Prettier")
                 
                 with final_file.open('w', encoding='utf-8') as f:
                     f.write(enhanced_text)
-                    logger.info("Successfully wrote enhanced transcript to file")
+                    logger.info("💾 Successfully wrote enhanced transcript to: %s", final_file)
             else:
-                logger.warning("Raw transcript is empty, skipping enhancement")
+                logger.warning("⚠️  Raw transcript is empty, skipping enhancement")
                 with final_file.open('w', encoding='utf-8') as f:
                     f.write("")  # Write empty file
         except Exception as e:
-            logger.error("Could not enhance transcript %s: %s", final_file, e)
+            logger.error("❌ Could not enhance transcript %s: %s", final_file, e)
             logger.exception("Full exception traceback:")
             # Fall back to raw text with title
             with final_file.open('w', encoding='utf-8') as f:
                 f.write(raw_text)
     else:
          # If enhancement is not enabled, just ensure the raw text is in the file
+        logger.info("💾 Writing raw transcript to: %s", final_file)
         with final_file.open('w', encoding='utf-8') as f:
             f.write(raw_text)
 

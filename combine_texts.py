@@ -16,20 +16,20 @@ def combine_text_files(folder_path: str, output_filename: str = "combined_output
         print(f"Error: {folder_path} is not a valid directory.")
         sys.exit(1)
 
-    txt_files = sorted(folder.glob("*.txt"))
-    if not txt_files:
-        print(f"No .txt files found in {folder_path}.")
+    mdx_files = sorted(folder.rglob("*.mdx"))
+    if not mdx_files:
+        print(f"No .mdx files found in {folder_path} or its subfolders.")
         sys.exit(1)
 
-    output_path = Path.cwd() / output_filename
+    output_path = Path.cwd() / "combined_output.mdx"
     with open(output_path, "w", encoding="utf-8") as outfile:
-        for i, txt_file in enumerate(txt_files):
-            with open(txt_file, "r", encoding="utf-8") as infile:
+        for i, mdx_file in enumerate(mdx_files):
+            with open(mdx_file, "r", encoding="utf-8") as infile:
                 if i > 0:
-                    outfile.write("\n---\n")
+                    outfile.write("\n")
                 outfile.write(infile.read())
                 outfile.write("\n")
-    print(f"Combined {len(txt_files)} files into {output_path}")
+    print(f"Combined {len(mdx_files)} files into {output_path}")
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
