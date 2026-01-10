@@ -596,8 +596,43 @@ def combine_channel_transcripts(output_dir: Path, channel_name: Optional[str] = 
             
             results[channel_name] = str(combined_file)
             print(f"✅ Combined {len(transcript_files)} transcripts for {channel_name} -> {combined_file}")
-            
+
         except Exception as e:
             print(f"❌ Error creating combined file for {channel_name}: {e}")
-    
+
     return results
+
+
+def combine_mdx_files(folder_path: Path, output_filename: str = "combined_output.mdx") -> Path:
+    """
+    Combine all .mdx files in a folder and its subfolders into a single file.
+
+    Args:
+        folder_path: Path to the folder containing .mdx files
+        output_filename: Name of the output file (default: combined_output.mdx)
+
+    Returns:
+        Path to the combined output file
+
+    Raises:
+        FileNotFoundError: If the folder doesn't exist
+    """
+    folder = Path(folder_path)
+    if not folder.is_dir():
+        raise FileNotFoundError(f"Folder not found: {folder_path}")
+
+    mdx_files = sorted(folder.rglob("*.mdx"))
+    if not mdx_files:
+        raise FileNotFoundError(f"No .mdx files found in {folder_path} or its subfolders.")
+
+    output_path = Path.cwd() / output_filename
+    with open(output_path, "w", encoding="utf-8") as outfile:
+        for i, mdx_file in enumerate(mdx_files):
+            with open(mdx_file, "r", encoding="utf-8") as infile:
+                if i > 0:
+                    outfile.write("\n")
+                outfile.write(infile.read())
+                outfile.write("\n")
+
+    print(f"✅ Combined {len(mdx_files)} files into {output_path}")
+    return output_path

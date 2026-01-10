@@ -17,6 +17,7 @@ from social_media_transcriber.core.downloader import Downloader
 from social_media_transcriber.core.transcriber import AudioTranscriber
 from social_media_transcriber.utils.file_utils import (
     combine_channel_transcripts,
+    combine_mdx_files,
     load_urls_from_file,
 )
 from social_media_transcriber.utils.processing import process_urls
@@ -131,7 +132,7 @@ def run(
     logger.info("Output saved to: %s", final_output_dir.resolve())
 
 
-@cli.command("combine")
+@cli.command("transcripts")
 @click.option(
     "-d", "--directory",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
@@ -144,7 +145,7 @@ def run(
     type=str,
     help="Specific channel/playlist folder name to combine (optional)."
 )
-def combine_transcripts(directory: Path, channel_name: Optional[str]) -> None:
+def transcripts_combine(directory: Path, channel_name: Optional[str]) -> None:
     """Combine multiple transcript files into a single file per channel."""
     logger.info("Combining transcripts in: %s", directory)
     results = combine_channel_transcripts(directory, channel_name)
@@ -154,6 +155,29 @@ def combine_transcripts(directory: Path, channel_name: Optional[str]) -> None:
             click.echo(f"  📁 {channel} -> {file_path}")
     else:
         click.echo("\n❌ No transcript files were combined.")
+
+
+@cli.command("combine")
+@click.argument(
+    "folder",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+)
+@click.option(
+    "-o", "--output",
+    type=str,
+    default="combined_output.mdx",
+    show_default=True,
+    help="Output filename for the combined file."
+)
+def combine_mdx(folder: Path, output: str) -> None:
+    """Combine all .mdx files in a folder into a single file for LLM processing."""
+    try:
+        output_path = combine_mdx_files(folder, output)
+        click.echo(f"✅ Created: {output_path}")
+    except FileNotFoundError as e:
+        click.echo(f"❌ {e}")
+    except Exception as e:
+        click.echo(f"❌ Error: {e}")
 
 
 if __name__ == "__main__":
