@@ -4,6 +4,8 @@ Abstract base classes and core provider implementations for video platforms.
 """
 
 import logging
+import os
+import platform
 import re
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -14,6 +16,9 @@ from social_media_transcriber.utils.file_utils import sanitize_folder_name
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Detect ARM architecture (Raspberry Pi, etc.)
+_IS_ARM = platform.machine() in ('aarch64', 'armv7l', 'armv6l')
 
 
 class VideoProvider(ABC):
@@ -66,7 +71,17 @@ class BaseYtDlpProvider(VideoProvider):
         # Zen browser uses Firefox's cookie storage, but we'll try it specifically first
         self._cookie_browsers = ['zen', 'firefox', 'chrome', 'safari', 'edge']
         self._current_browser_idx = 0
-        
+
+        # Check environment variable to disable cookies entirely
+        if os.environ.get('YT_COOKIE_BROWSER') == 'none':
+            self._cookie_browsers = []
+            logger.info("Cookies disabled via YT_COOKIE_BROWSER=none")
+
+        # Skip Firefox on ARM (Raspberry Pi) - browser-cookie3 has known issues
+        elif _IS_ARM and 'firefox' in self._cookie_browsers:
+            self._cookie_browsers = [b for b in self._cookie_browsers if b != 'firefox']
+            logger.info("ARM detected (%s), skipping Firefox cookies (use YT_COOKIE_BROWSER=none to disable all cookies)", platform.machine())
+
         self._ydl_extract_opts: Dict[str, Any] = {
             'quiet': True,
             'no_warnings': True,
@@ -80,46 +95,47 @@ class BaseYtDlpProvider(VideoProvider):
             'format': 'bestaudio/best',
             'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'wav'}],
         }
-        
-        # Add browser cookie support
+
+        # Add browser cookie support (with error handling for ARM/other platforms)
         self._add_cookie_support()
 
     def _add_cookie_support(self) -> None:
         """Add browser cookie support to yt-dlp options."""
-        if self._current_browser_idx < len(self._cookie_browsers):
-            browser = self._cookie_browsers[self._current_browser_idx]
-            
-            # For Zen browser, we need to specify the profile path since it's Firefox-based
-            # but has its own profile directory
-            if browser == 'zen':
-                # Try to find Zen browser profile path (macOS)
-                import os
-                zen_profile_path = os.path.expanduser("~/Library/Application Support/zen/Profiles")
-                if os.path.exists(zen_profile_path):
-                    # Find profiles in the Zen directory
-                    profiles = [p for p in os.listdir(zen_profile_path) 
-                               if os.path.isdir(os.path.join(zen_profile_path, p)) and not p.startswith('.')]
-                    if profiles:
-                        # Use the first profile found (there's usually just one)
-                        profile_name = profiles[0]
-                        profile_path = os.path.join(zen_profile_path, profile_name)
-                        
-                        # Use tuple format for yt-dlp Python API: (browser_name, profile_path)
-                        cookie_config = ('firefox', profile_path)
-                        self._ydl_extract_opts['cookiesfrombrowser'] = cookie_config
-                        self._ydl_download_opts['cookiesfrombrowser'] = cookie_config
-                        logger.info("Using cookies from Zen browser profile: %s", profile_name)
-                        return
-                
-                # Fallback to regular firefox if Zen profile not found
-                logger.warning("Zen browser profile not found, falling back to Firefox")
-                browser = 'firefox'
-            
-            # Use the correct yt-dlp option format for cookies from browser
-            # This is equivalent to --cookies-from-browser BROWSER
-            self._ydl_extract_opts['cookiesfrombrowser'] = browser
-            self._ydl_download_opts['cookiesfrombrowser'] = browser
-            logger.info("Using cookies from %s browser", browser)
+        if self._current_browser_idx >= len(self._cookie_browsers):
+            return
+
+        browser = self._cookie_browsers[self._current_browser_idx]
+
+        # For Zen browser, we need to specify the profile path since it's Firefox-based
+        # but has its own profile directory
+        if browser == 'zen':
+            # Try to find Zen browser profile path (macOS)
+            zen_profile_path = os.path.expanduser("~/Library/Application Support/zen/Profiles")
+            if os.path.exists(zen_profile_path):
+                # Find profiles in the Zen directory
+                profiles = [p for p in os.listdir(zen_profile_path)
+                           if os.path.isdir(os.path.join(zen_profile_path, p)) and not p.startswith('.')]
+                if profiles:
+                    # Use the first profile found (there's usually just one)
+                    profile_name = profiles[0]
+                    profile_path = os.path.join(zen_profile_path, profile_name)
+
+                    # Use tuple format for yt-dlp Python API: (browser_name, profile_path)
+                    cookie_config = ('firefox', profile_path)
+                    self._ydl_extract_opts['cookiesfrombrowser'] = cookie_config
+                    self._ydl_download_opts['cookiesfrombrowser'] = cookie_config
+                    logger.info("Using cookies from Zen browser profile: %s", profile_name)
+                    return
+
+            # Fallback to regular firefox if Zen profile not found
+            logger.warning("Zen browser profile not found, falling back to Firefox")
+            browser = 'firefox'
+
+        # Use the correct yt-dlp option format for cookies from browser
+        # This is equivalent to --cookies-from-browser BROWSER
+        self._ydl_extract_opts['cookiesfrombrowser'] = browser
+        self._ydl_download_opts['cookiesfrombrowser'] = browser
+        logger.info("Using cookies from %s browser", browser)
 
     def _try_next_browser(self) -> bool:
         """Try the next browser for cookies. Returns True if another browser is available."""
