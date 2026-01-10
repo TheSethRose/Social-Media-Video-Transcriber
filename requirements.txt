@@ -6,3 +6,4 @@ requests
 click
 pytest
 python-dotenv
+rich

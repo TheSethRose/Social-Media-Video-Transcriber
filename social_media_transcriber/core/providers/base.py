@@ -154,16 +154,7 @@ class BaseYtDlpProvider(VideoProvider):
                     info = ydl.extract_info(url, download=download)
                     if not info:
                         raise RuntimeError(f"Could not extract metadata for URL: {url}")
-                    
-                    # Debug: Log the type and structure of info
-                    logger.info(f"DEBUG: yt-dlp returned type: {type(info)}")
-                    if isinstance(info, list):
-                        logger.info(f"DEBUG: List with {len(info)} entries")
-                        if info:
-                            logger.info(f"DEBUG: First entry keys: {list(info[0].keys())[:10]}")
-                    else:
-                        logger.info(f"DEBUG: Dict with keys: {list(info.keys())[:10]}")
-                    
+
                     # Handle flat extraction (returns list of entries)
                     if isinstance(info, list):
                         # This is a flat extraction result - create a playlist-like structure
@@ -178,7 +169,6 @@ class BaseYtDlpProvider(VideoProvider):
                                 'uploader': first_entry.get('playlist_uploader'),
                                 'channel': first_entry.get('playlist_channel'),
                             }
-                            logger.info(f"DEBUG: Created playlist structure with {len(info)} entries")
                             return playlist_info
                         else:
                             raise RuntimeError(f"No entries found for URL: {url}")

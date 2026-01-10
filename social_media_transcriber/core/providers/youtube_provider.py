@@ -3,8 +3,8 @@
 
 import re
 import logging
+import requests
 from typing import Dict, Any, Optional, Tuple
-from urllib.parse import urlparse, parse_qs
 from pathlib import Path
 import yt_dlp
 from .base import BaseYtDlpProvider
@@ -88,7 +88,6 @@ class YouTubeProvider(BaseYtDlpProvider):
                             if lang in subtitles and subtitles[lang]:
                                 subtitle_url = subtitles[lang][0].get('url')
                                 if subtitle_url:
-                                    import requests
                                     response = requests.get(subtitle_url, timeout=10)
                                     response.raise_for_status()
                                     
@@ -105,10 +104,9 @@ class YouTubeProvider(BaseYtDlpProvider):
                             if lang in auto_captions and auto_captions[lang]:
                                 subtitle_url = auto_captions[lang][0].get('url')
                                 if subtitle_url:
-                                    import requests
                                     response = requests.get(subtitle_url, timeout=10)
                                     response.raise_for_status()
-                                    
+
                                     transcript_text = self._parse_subtitle_content(response.text)
                                     if transcript_text:
                                         logger.info("Successfully extracted transcript from YouTube automatic captions")

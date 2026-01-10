@@ -41,7 +41,8 @@ setup(
         "parakeet-mlx>=0.1.0",
         "click>=8.0.0",
         "mlx",
-        "python-dotenv>=0.21.0"
+        "python-dotenv>=0.21.0",
+        "rich>=13.0.0"
     ],
     entry_points={
         "console_scripts": [

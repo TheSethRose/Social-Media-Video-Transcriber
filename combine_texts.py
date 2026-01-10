@@ -2,7 +2,7 @@
 """
 combine_texts.py
 
-Combines all .txt files in a specified folder into a single file in the project root.
+Combines all .mdx files in a specified folder into a single file in the project root.
 Usage:
     python combine_texts.py /path/to/folder
 """
@@ -10,7 +10,7 @@ import sys
 import os
 from pathlib import Path
 
-def combine_text_files(folder_path: str, output_filename: str = "combined_output.txt"):
+def combine_mdx_files(folder_path: str, output_filename: str = "combined_output.mdx"):
     folder = Path(folder_path)
     if not folder.is_dir():
         print(f"Error: {folder_path} is not a valid directory.")
@@ -35,4 +35,4 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python combine_texts.py /path/to/folder")
         sys.exit(1)
-    combine_text_files(sys.argv[1])
+    combine_mdx_files(sys.argv[1])
